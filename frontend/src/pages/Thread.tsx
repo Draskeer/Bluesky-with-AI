@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import type { BlueskyPost } from "../types";
 
@@ -11,6 +11,7 @@ interface ThreadPost {
 
 export default function Thread() {
   const { "*": uriPath } = useParams();
+  const navigate = useNavigate();
   const uri = uriPath ? decodeURIComponent(uriPath) : null;
   const [thread, setThread] = useState<ThreadPost | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,14 +59,14 @@ export default function Thread() {
     if (!post) return null;
 
     return (
-      <div key={post.uri} className={depth > 0 ? "ml-12 border-l-2 border-[#e6ecf0] dark:border-[#38444d]" : ""}>
-        <article className="px-4 py-3 border-b border-[#e6ecf0] dark:border-[#38444d] hover:bg-[#f5f8fa] dark:hover:bg-[#192734] transition-colors">
+      <div key={post.uri} className={depth > 0 ? "ml-12 border-l-2 border-[#2f3e4e]" : ""}>
+        <article className="px-4 py-3 border-b border-[#2f3e4e] hover:bg-[#1c2938] transition-colors">
           <div className="flex gap-3">
             <Link to={`/profile/${post.author.handle}`} className="flex-shrink-0">
               <img
                 src={post.author.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${post.author.handle}`}
                 alt={post.author.displayName || post.author.handle}
-                className="w-12 h-12 rounded-full hover:opacity-90 transition"
+                className="w-11 h-11 rounded-full hover:opacity-90 transition"
               />
             </Link>
 
@@ -73,19 +74,19 @@ export default function Thread() {
               <div className="flex items-center gap-1 text-[15px]">
                 <Link
                   to={`/profile/${post.author.handle}`}
-                  className="font-bold text-[#14171a] dark:text-[#d9d9d9] hover:underline truncate"
+                  className="font-bold text-white hover:underline truncate"
                 >
                   {post.author.displayName || post.author.handle}
                 </Link>
-                <span className="text-[#657786] dark:text-[#8899a6] truncate">@{post.author.handle}</span>
+                <span className="text-gray-500 truncate">@{post.author.handle}</span>
               </div>
 
-              <p className="mt-1 text-[15px] text-[#14171a] dark:text-[#d9d9d9] whitespace-pre-wrap break-words">
+              <p className="mt-1 text-[15px] text-white whitespace-pre-wrap break-words">
                 {post.record.text}
               </p>
 
               {/* Actions */}
-              <div className="flex items-center gap-8 mt-3 text-[#657786] dark:text-[#8899a6]">
+              <div className="flex items-center gap-8 mt-3 text-gray-500">
                 <span className="flex items-center gap-2 text-[13px]">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -160,7 +161,7 @@ export default function Thread() {
       )}
 
       {/* Main Post - Expanded view */}
-      <article className="px-4 py-3 border-b border-[#e6ecf0] dark:border-[#38444d]">
+      <article className="px-4 py-3 border-b border-[#2f3e4e]">
         <div className="flex gap-3">
           <Link to={`/profile/${mainPost.author.handle}`}>
             <img
@@ -172,22 +173,22 @@ export default function Thread() {
 
           <div className="flex-1">
             <Link to={`/profile/${mainPost.author.handle}`} className="block">
-              <span className="font-bold text-[15px] text-[#14171a] dark:text-[#d9d9d9] hover:underline">
+              <span className="font-bold text-[15px] text-white hover:underline">
                 {mainPost.author.displayName || mainPost.author.handle}
               </span>
-              <span className="block text-[15px] text-[#657786] dark:text-[#8899a6]">@{mainPost.author.handle}</span>
+              <span className="block text-[15px] text-gray-500">@{mainPost.author.handle}</span>
             </Link>
           </div>
         </div>
 
         {/* Main post content - larger */}
-        <p className="mt-3 text-[23px] text-[#14171a] dark:text-[#d9d9d9] whitespace-pre-wrap break-words leading-7">
+        <p className="mt-3 text-[23px] text-white whitespace-pre-wrap break-words leading-7">
           {mainPost.record.text}
         </p>
 
         {/* Images */}
         {mainPost.embed?.images && mainPost.embed.images.length > 0 && (
-          <div className={`mt-3 rounded-2xl overflow-hidden border border-[#e6ecf0] dark:border-[#38444d] ${
+          <div className={`mt-3 rounded-2xl overflow-hidden border border-[#2f3e4e] ${
             mainPost.embed.images.length > 1 ? "grid grid-cols-2 gap-0.5" : ""
           }`}>
             {mainPost.embed.images.map((img: any, idx: number) => (
@@ -195,47 +196,100 @@ export default function Thread() {
                 key={idx}
                 src={img.thumb || img.fullsize}
                 alt={img.alt || "Image"}
-                className="w-full object-cover max-h-[400px]"
+                className="w-full object-cover max-h-[400px] cursor-pointer"
+                onClick={() => window.open(img.fullsize || img.thumb, "_blank")}
               />
             ))}
           </div>
         )}
 
+        {/* Images from recordWithMedia (quote with images) */}
+        {mainPost.embed?.media?.images && mainPost.embed.media.images.length > 0 && (
+          <div className={`mt-3 rounded-2xl overflow-hidden border border-[#2f3e4e] ${
+            mainPost.embed.media.images.length > 1 ? "grid grid-cols-2 gap-0.5" : ""
+          }`}>
+            {mainPost.embed.media.images.map((img: any, idx: number) => (
+              <img
+                key={idx}
+                src={img.thumb || img.fullsize}
+                alt={img.alt || "Image"}
+                className="w-full object-cover max-h-[400px] cursor-pointer"
+                onClick={() => window.open(img.fullsize || img.thumb, "_blank")}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Quote embed (cited post) */}
+        {(mainPost.embed?.$type === "app.bsky.embed.record#view" || 
+          mainPost.embed?.$type === "app.bsky.embed.recordWithMedia#view") && 
+          renderQuoteEmbed(mainPost.embed?.record?.record || mainPost.embed?.record, navigate, mainPost)}
+
+        {/* External link embed */}
+        {mainPost.embed?.$type === "app.bsky.embed.external#view" && mainPost.embed?.external && (
+          <a
+            href={mainPost.embed.external.uri}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 border border-[#2f3e4e] rounded-xl overflow-hidden block hover:bg-[#1c2938]/50 transition"
+          >
+            {mainPost.embed.external.thumb && (
+              <img
+                src={mainPost.embed.external.thumb}
+                alt={mainPost.embed.external.title}
+                className="w-full h-[200px] object-cover"
+              />
+            )}
+            <div className="p-3">
+              <p className="text-gray-500 text-xs truncate">{new URL(mainPost.embed.external.uri).hostname}</p>
+              <p className="font-semibold text-[15px] text-white mt-0.5 line-clamp-2">{mainPost.embed.external.title}</p>
+              {mainPost.embed.external.description && (
+                <p className="text-gray-400 text-[14px] mt-1 line-clamp-2">{mainPost.embed.external.description}</p>
+              )}
+            </div>
+          </a>
+        )}
+
         {/* Timestamp */}
-        <div className="mt-4 text-[15px] text-[#657786] dark:text-[#8899a6] border-b border-[#e6ecf0] dark:border-[#38444d] pb-3">
+        <div className="mt-4 text-[15px] text-gray-500 border-b border-[#2f3e4e] pb-3">
           {formatDate(mainPost.record.createdAt)}
         </div>
 
         {/* Stats */}
-        <div className="py-3 border-b border-[#e6ecf0] dark:border-[#38444d] flex gap-5 text-[15px]">
+        <div className="py-3 border-b border-[#2f3e4e] flex gap-5 text-[15px]">
           <span>
-            <strong className="text-[#14171a] dark:text-[#d9d9d9]">{mainPost.repostCount || 0}</strong>{" "}
-            <span className="text-[#657786] dark:text-[#8899a6]">Retweets</span>
+            <strong className="text-white">{mainPost.repostCount || 0}</strong>{" "}
+            <span className="text-gray-500">Reposts</span>
           </span>
           <span>
-            <strong className="text-[#14171a] dark:text-[#d9d9d9]">{mainPost.likeCount || 0}</strong>{" "}
-            <span className="text-[#657786] dark:text-[#8899a6]">J'aime</span>
+            <strong className="text-white">{mainPost.likeCount || 0}</strong>{" "}
+            <span className="text-gray-500">J'aime</span>
           </span>
         </div>
 
         {/* Action buttons */}
-        <div className="py-2 flex justify-around text-[#657786] dark:text-[#8899a6]">
-          <button className="p-2 rounded-full hover:bg-[#e8f5fe] dark:hover:bg-[#1da1f2]/10 hover:text-[#1da1f2] transition">
+        <div className="py-2 flex justify-around text-gray-500">
+          <button className="p-2 rounded-full hover:bg-[#0085ff]/10 hover:text-[#0085ff] transition">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </button>
-          <button className="p-2 rounded-full hover:bg-[#e6f7ed] dark:hover:bg-[#17bf63]/10 hover:text-[#17bf63] transition">
+          <button className="p-2 rounded-full hover:bg-[#00ba7c]/10 hover:text-[#00ba7c] transition">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
-          <button className="p-2 rounded-full hover:bg-[#fce8ef] dark:hover:bg-[#e0245e]/10 hover:text-[#e0245e] transition">
+          <button className="p-2 rounded-full hover:bg-[#f91880]/10 hover:text-[#f91880] transition">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
           </button>
-          <button className="p-2 rounded-full hover:bg-[#e8f5fe] dark:hover:bg-[#1da1f2]/10 hover:text-[#1da1f2] transition">
+          <button className="p-2 rounded-full hover:bg-[#0085ff]/10 hover:text-[#0085ff] transition">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+          </button>
+          <button className="p-2 rounded-full hover:bg-[#0085ff]/10 hover:text-[#0085ff] transition">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
@@ -246,8 +300,8 @@ export default function Thread() {
       {/* Replies */}
       {thread.replies && thread.replies.length > 0 && (
         <div>
-          <div className="px-4 py-3 border-b border-[#e6ecf0] dark:border-[#38444d]">
-            <span className="text-[15px] font-bold text-[#14171a] dark:text-[#d9d9d9]">
+          <div className="px-4 py-3 border-b border-[#2f3e4e]">
+            <span className="text-[15px] font-bold text-white">
               {thread.replies.length} réponse{thread.replies.length > 1 ? "s" : ""}
             </span>
           </div>
@@ -257,7 +311,7 @@ export default function Thread() {
 
       {/* No replies */}
       {(!thread.replies || thread.replies.length === 0) && (
-        <div className="px-4 py-12 text-center text-[#657786] dark:text-[#8899a6]">
+        <div className="px-4 py-12 text-center text-gray-500">
           <p>Aucune réponse pour le moment</p>
           <p className="mt-1 text-sm">Soyez le premier à répondre !</p>
         </div>
@@ -275,7 +329,7 @@ function renderParentChain(parent: ThreadPost): JSX.Element | null {
   return (
     <>
       {parent.parent && renderParentChain(parent.parent)}
-      <article className="px-4 py-3 hover:bg-[#f5f8fa] dark:hover:bg-[#192734] transition-colors">
+      <article className="px-4 py-3 hover:bg-[#1c2938] transition-colors">
         <div className="flex gap-3">
           <div className="flex flex-col items-center">
             <Link to={`/profile/${post.author.handle}`}>
@@ -285,26 +339,90 @@ function renderParentChain(parent: ThreadPost): JSX.Element | null {
                 className="w-12 h-12 rounded-full hover:opacity-90 transition"
               />
             </Link>
-            <div className="w-0.5 flex-1 bg-[#ccd6dd] dark:bg-[#38444d] mt-2"></div>
+            <div className="w-0.5 flex-1 bg-[#2f3e4e] mt-2"></div>
           </div>
 
           <div className="flex-1 min-w-0 pb-3">
             <div className="flex items-center gap-1 text-[15px]">
               <Link
                 to={`/profile/${post.author.handle}`}
-                className="font-bold text-[#14171a] dark:text-[#d9d9d9] hover:underline truncate"
+                className="font-bold text-white hover:underline truncate"
               >
                 {post.author.displayName || post.author.handle}
               </Link>
-              <span className="text-[#657786] dark:text-[#8899a6] truncate">@{post.author.handle}</span>
+              <span className="text-gray-500 truncate">@{post.author.handle}</span>
             </div>
 
-            <p className="mt-1 text-[15px] text-[#14171a] dark:text-[#d9d9d9] whitespace-pre-wrap break-words">
+            <p className="mt-1 text-[15px] text-white whitespace-pre-wrap break-words">
               {post.record.text}
             </p>
           </div>
         </div>
       </article>
     </>
+  );
+}
+
+// Helper to render quote embed
+function renderQuoteEmbed(quotedPost: any, navigate: (path: string) => void, post?: any): JSX.Element | null {
+  if (!quotedPost?.author) return null;
+
+  // Get images from the quoted post - check multiple possible locations
+  const quotedImages = 
+    quotedPost.embeds?.[0]?.images || 
+    quotedPost.embed?.images ||
+    [];
+  
+  // Also check for images in recordWithMedia
+  const mediaImages = post?.embed?.media?.images || 
+    quotedPost.embeds?.[0]?.media?.images || 
+    [];
+  
+  const allQuotedImages = quotedImages.length > 0 ? quotedImages : mediaImages;
+
+  return (
+    <div 
+      className="mt-3 border border-[#2f3e4e] rounded-xl overflow-hidden hover:bg-[#1c2938]/50 transition cursor-pointer"
+      onClick={() => {
+        if (quotedPost.uri) {
+          navigate(`/post/${encodeURIComponent(quotedPost.uri)}`);
+        }
+      }}
+    >
+      <div className="p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <img
+            src={quotedPost.author.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${quotedPost.author.handle}`}
+            alt={quotedPost.author.displayName || quotedPost.author.handle}
+            className="w-6 h-6 rounded-full"
+          />
+          <span className="font-semibold text-[14px] text-white truncate">
+            {quotedPost.author.displayName || quotedPost.author.handle}
+          </span>
+          <span className="text-gray-500 text-[14px] truncate">
+            @{quotedPost.author.handle}
+          </span>
+        </div>
+        <p className="text-[15px] text-gray-200 whitespace-pre-wrap break-words">
+          {quotedPost.value?.text || quotedPost.text || ""}
+        </p>
+        
+        {/* Quoted post images */}
+        {allQuotedImages.length > 0 && (
+          <div className={`mt-2 rounded-lg overflow-hidden ${
+            allQuotedImages.length > 1 ? "grid grid-cols-2 gap-0.5" : ""
+          }`}>
+            {allQuotedImages.map((img: any, idx: number) => (
+              <img
+                key={idx}
+                src={img.thumb || img.fullsize}
+                alt={img.alt || "Image"}
+                className="w-full object-cover max-h-[200px]"
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

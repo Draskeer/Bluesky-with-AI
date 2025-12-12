@@ -308,4 +308,80 @@ export const api = {
       });
     },
   },
+
+  feeds: {
+    getSavedFeeds: async (): Promise<ApiResponse<{ feeds: any[] }>> => {
+      return request<{ feeds: any[] }>('/feeds/saved');
+    },
+
+    getPopularFeeds: async (options?: { limit?: number; cursor?: string }): Promise<ApiResponse<{ feeds: any[]; cursor?: string }>> => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set('limit', String(options.limit));
+      if (options?.cursor) params.set('cursor', options.cursor);
+      const query = params.toString() ? `?${params}` : '';
+      return request<{ feeds: any[]; cursor?: string }>(`/feeds/popular${query}`);
+    },
+
+    searchFeeds: async (query: string, options?: { limit?: number; cursor?: string }): Promise<ApiResponse<{ feeds: any[]; cursor?: string }>> => {
+      const params = new URLSearchParams();
+      params.set('q', query);
+      if (options?.limit) params.set('limit', String(options.limit));
+      if (options?.cursor) params.set('cursor', options.cursor);
+      return request<{ feeds: any[]; cursor?: string }>(`/feeds/search?${params}`);
+    },
+
+    getFeed: async (feedUri: string, options?: { limit?: number; cursor?: string }): Promise<ApiResponse<{ feed: any[]; cursor?: string }>> => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set('limit', String(options.limit));
+      if (options?.cursor) params.set('cursor', options.cursor);
+      const query = params.toString() ? `?${params}` : '';
+      return request<{ feed: any[]; cursor?: string }>(`/feeds/${encodeURIComponent(feedUri)}${query}`);
+    },
+
+    saveFeed: async (feedUri: string): Promise<ApiResponse<{ uri: string }>> => {
+      return request<{ uri: string }>('/feeds/save', {
+        method: 'POST',
+        body: JSON.stringify({ feed: feedUri }),
+      });
+    },
+
+    unsaveFeed: async (feedUri: string): Promise<ApiResponse<{ message: string }>> => {
+      return request<{ message: string }>(`/feeds/saved/${encodeURIComponent(feedUri)}`, {
+        method: 'DELETE',
+      });
+    },
+  },
+
+  lists: {
+    getLists: async (purpose?: 'curate' | 'modlist'): Promise<ApiResponse<{ lists: any[]; cursor?: string }>> => {
+      const params = purpose ? `?purpose=${purpose}` : '';
+      return request<{ lists: any[]; cursor?: string }>(`/lists${params}`);
+    },
+
+    getList: async (listUri: string): Promise<ApiResponse<{ list: any; items: any[]; cursor?: string }>> => {
+      return request<{ list: any; items: any[]; cursor?: string }>(`/lists/${encodeURIComponent(listUri)}`);
+    },
+  },
+
+  saved: {
+    getSavedPosts: async (): Promise<ApiResponse<{ posts: any[] }>> => {
+      return request<{ posts: any[] }>('/saved');
+    },
+
+    savePost: async (postUri: string): Promise<ApiResponse<{ message: string }>> => {
+      return request<{ message: string }>(`/saved/${encodeURIComponent(postUri)}`, {
+        method: 'POST',
+      });
+    },
+
+    unsavePost: async (postUri: string): Promise<ApiResponse<{ message: string }>> => {
+      return request<{ message: string }>(`/saved/${encodeURIComponent(postUri)}`, {
+        method: 'DELETE',
+      });
+    },
+
+    checkSaved: async (postUri: string): Promise<ApiResponse<{ saved: boolean }>> => {
+      return request<{ saved: boolean }>(`/saved/check/${encodeURIComponent(postUri)}`);
+    },
+  },
 };

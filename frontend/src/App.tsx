@@ -8,6 +8,10 @@ import Profile from "./pages/Profile";
 import Thread from "./pages/Thread";
 import Notifications from "./pages/Notifications";
 import Chat from "./pages/Chat";
+import Settings from "./pages/Settings";
+import Feeds from "./pages/Feeds";
+import Lists from "./pages/Lists";
+import Saved from "./pages/Saved";
 import Layout from "./components/Layout";
 
 function App() {
@@ -107,6 +111,54 @@ function App() {
           isAuthenticated ? (
             <Layout>
               <Thread />
+            </Layout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Settings />
+            </Layout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
+      />
+      <Route
+        path="/feeds"
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Feeds />
+            </Layout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
+      />
+      <Route
+        path="/lists"
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Lists />
+            </Layout>
+          ) : (
+            <Navigate to="/login" />
+          )
+        }
+      />
+      <Route
+        path="/saved"
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Saved />
             </Layout>
           ) : (
             <Navigate to="/login" />
