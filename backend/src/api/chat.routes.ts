@@ -29,12 +29,23 @@ router.get('/convos', async (req: Request, res: Response) => {
     }
 
     const agent = (bluesky as any).getAgent();
+    const session = bluesky.getSession();
     
-    // Use the chat API
-    const result = await agent.api.chat.bsky.convo.listConvos({
-      limit: limit || 25,
-      cursor
-    });
+    if (!session) {
+      res.status(401).json({ success: false, error: 'No session' });
+      return;
+    }
+
+    // Use the chat API with proper proxy header
+    // The chat API requires using the DID's PDS as the service endpoint
+    const result = await agent.api.chat.bsky.convo.listConvos(
+      { limit: limit || 25, cursor },
+      { 
+        headers: { 
+          'atproto-proxy': `did:web:api.bsky.chat#bsky_chat`
+        } 
+      }
+    );
 
     res.json({
       success: true,
@@ -43,9 +54,9 @@ router.get('/convos', async (req: Request, res: Response) => {
         cursor: result.data.cursor
       }
     });
-  } catch (error) {
-    logger.error('List convos error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch conversations' });
+  } catch (error: any) {
+    logger.error('List convos error:', error?.message || error);
+    res.status(500).json({ success: false, error: error?.message || 'Failed to fetch conversations' });
   }
 });
 
@@ -66,11 +77,10 @@ router.get('/convos/:convoId', async (req: Request, res: Response) => {
 
     const agent = (bluesky as any).getAgent();
     
-    const result = await agent.api.chat.bsky.convo.getMessages({
-      convoId,
-      limit: limit || 50,
-      cursor
-    });
+    const result = await agent.api.chat.bsky.convo.getMessages(
+      { convoId, limit: limit || 50, cursor },
+      { headers: { 'atproto-proxy': `did:web:api.bsky.chat#bsky_chat` } }
+    );
 
     res.json({
       success: true,
@@ -79,9 +89,9 @@ router.get('/convos/:convoId', async (req: Request, res: Response) => {
         cursor: result.data.cursor
       }
     });
-  } catch (error) {
-    logger.error('Get messages error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch messages' });
+  } catch (error: any) {
+    logger.error('Get messages error:', error?.message || error);
+    res.status(500).json({ success: false, error: error?.message || 'Failed to fetch messages' });
   }
 });
 
@@ -108,20 +118,18 @@ router.post('/convos/:convoId/messages', async (req: Request, res: Response) => 
 
     const agent = (bluesky as any).getAgent();
     
-    const result = await agent.api.chat.bsky.convo.sendMessage({
-      convoId,
-      message: {
-        text
-      }
-    });
+    const result = await agent.api.chat.bsky.convo.sendMessage(
+      { convoId, message: { text } },
+      { headers: { 'atproto-proxy': `did:web:api.bsky.chat#bsky_chat` } }
+    );
 
     res.json({
       success: true,
       data: result.data
     });
-  } catch (error) {
-    logger.error('Send message error:', error);
-    res.status(500).json({ success: false, error: 'Failed to send message' });
+  } catch (error: any) {
+    logger.error('Send message error:', error?.message || error);
+    res.status(500).json({ success: false, error: error?.message || 'Failed to send message' });
   }
 });
 
@@ -147,17 +155,18 @@ router.post('/convos', async (req: Request, res: Response) => {
 
     const agent = (bluesky as any).getAgent();
     
-    const result = await agent.api.chat.bsky.convo.getConvoForMembers({
-      members
-    });
+    const result = await agent.api.chat.bsky.convo.getConvoForMembers(
+      { members },
+      { headers: { 'atproto-proxy': `did:web:api.bsky.chat#bsky_chat` } }
+    );
 
     res.json({
       success: true,
       data: result.data.convo
     });
-  } catch (error) {
-    logger.error('Create convo error:', error);
-    res.status(500).json({ success: false, error: 'Failed to create conversation' });
+  } catch (error: any) {
+    logger.error('Create convo error:', error?.message || error);
+    res.status(500).json({ success: false, error: error?.message || 'Failed to create conversation' });
   }
 });
 
@@ -177,17 +186,18 @@ router.post('/convos/:convoId/read', async (req: Request, res: Response) => {
 
     const agent = (bluesky as any).getAgent();
     
-    await agent.api.chat.bsky.convo.updateRead({
-      convoId
-    });
+    await agent.api.chat.bsky.convo.updateRead(
+      { convoId },
+      { headers: { 'atproto-proxy': `did:web:api.bsky.chat#bsky_chat` } }
+    );
 
     res.json({
       success: true,
       data: { message: 'Conversation marked as read' }
     });
-  } catch (error) {
-    logger.error('Mark read error:', error);
-    res.status(500).json({ success: false, error: 'Failed to mark as read' });
+  } catch (error: any) {
+    logger.error('Mark read error:', error?.message || error);
+    res.status(500).json({ success: false, error: error?.message || 'Failed to mark as read' });
   }
 });
 

@@ -478,7 +478,14 @@ export class BlueskyService {
       followersCount: data.followersCount || 0,
       followsCount: data.followsCount || 0,
       postsCount: data.postsCount || 0,
-      indexedAt: data.indexedAt
+      indexedAt: data.indexedAt,
+      viewer: data.viewer ? {
+        muted: data.viewer.muted,
+        blockedBy: data.viewer.blockedBy,
+        blocking: data.viewer.blocking,
+        following: data.viewer.following,
+        followedBy: data.viewer.followedBy
+      } : undefined
     };
   }
 

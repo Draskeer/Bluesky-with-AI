@@ -99,8 +99,8 @@ export const api = {
       });
     },
 
-    unfollow: async (did: string): Promise<ApiResponse<void>> => {
-      return request<void>(`/profiles/${encodeURIComponent(did)}/follow`, {
+    unfollow: async (followUri: string): Promise<ApiResponse<void>> => {
+      return request<void>(`/profiles/follows/${encodeURIComponent(followUri)}`, {
         method: 'DELETE',
       });
     },

@@ -25,6 +25,13 @@ export interface BlueskyProfile {
   followsCount: number;
   postsCount: number;
   indexedAt?: string;
+  viewer?: {
+    muted?: boolean;
+    blockedBy?: boolean;
+    blocking?: string;
+    following?: string;
+    followedBy?: string;
+  };
 }
 
 export interface BlueskyPost {
