@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* Support for safe areas on iOS */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  
+  body {
+    @apply bg-[#e6ecf0] text-[#14171a] min-h-screen;
+    @apply dark:bg-[#15202b] dark:text-[#d9d9d9];
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior-y: contain;
+  }
+  
+  * {
+    @apply border-[#e1e8ed] dark:border-[#38444d];
+    /* Improve touch targets */
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  /* Twitter-style buttons */
+  .btn-twitter {
+    @apply px-4 py-2 rounded-full font-bold text-sm transition-all duration-200;
+    @apply focus:outline-none;
+  }
+  
+  .btn-twitter-primary {
+    @apply bg-[#1da1f2] text-white hover:bg-[#1a91da];
+  }
+  
+  .btn-twitter-outline {
+    @apply bg-transparent text-[#1da1f2] border border-[#1da1f2] hover:bg-[#e8f5fe];
+    @apply dark:hover:bg-[#1da1f2]/10;
+  }
+  
+  .btn-twitter-danger {
+    @apply bg-transparent text-[#e0245e] border border-[#e0245e] hover:bg-[#fce8ef];
+    @apply dark:hover:bg-[#e0245e]/10;
+  }
+
+  /* Twitter card style */
+  .tweet-card {
+    @apply bg-white border-b border-[#e6ecf0] px-4 py-3;
+    @apply hover:bg-[#f5f8fa] transition-colors cursor-pointer;
+    @apply dark:bg-[#15202b] dark:border-[#38444d] dark:hover:bg-[#192734];
+  }
+
+  /* Input style */
+  .input-twitter {
+    @apply w-full px-3 py-2 border border-[#ccd6dd] rounded;
+    @apply focus:outline-none focus:border-[#1da1f2] focus:ring-1 focus:ring-[#1da1f2];
+    @apply placeholder:text-[#657786];
+    @apply dark:bg-[#192734] dark:border-[#38444d] dark:text-white dark:placeholder:text-[#8899a6];
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+  
+  .badge-blue {
+    @apply bg-[#e8f5fe] text-[#1da1f2];
+    @apply dark:bg-[#1da1f2]/20;
+  }
+
+  /* Card background for light/dark */
+  .card-bg {
+    @apply bg-white dark:bg-[#192734];
+  }
+
+  /* Text colors with dark mode */
+  .text-primary {
+    @apply text-[#14171a] dark:text-[#d9d9d9];
+  }
+
+  .text-secondary {
+    @apply text-[#657786] dark:text-[#8899a6];
+  }
+
+  /* Border colors */
+  .border-default {
+    @apply border-[#e6ecf0] dark:border-[#38444d];
+  }
+
+  /* Hover backgrounds */
+  .hover-bg {
+    @apply hover:bg-[#f5f8fa] dark:hover:bg-[#192734];
+  }
+}
+
+@layer utilities {
+  /* Twitter colors */
+  .text-twitter-blue {
+    color: #1da1f2;
+  }
+  
+  .bg-twitter-blue {
+    background-color: #1da1f2;
+  }
+  
+  .border-twitter-blue {
+    border-color: #1da1f2;
+  }
+  
+  .text-twitter-dark {
+    @apply text-[#14171a] dark:text-[#d9d9d9];
+  }
+  
+  .text-twitter-gray {
+    @apply text-[#657786] dark:text-[#8899a6];
+  }
+  
+  .text-twitter-light-gray {
+    @apply text-[#aab8c2] dark:text-[#657786];
+  }
+  
+  .bg-twitter-extra-light {
+    @apply bg-[#f5f8fa] dark:bg-[#192734];
+  }
+  
+  .bg-twitter-light {
+    @apply bg-[#e6ecf0] dark:bg-[#15202b];
+  }
+
+  /* Scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-[#ccd6dd] dark:bg-[#38444d] rounded-full;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-[#aab8c2] dark:bg-[#657786];
+  }
+}
