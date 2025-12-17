@@ -16,6 +16,54 @@ interface PostCardProps {
   onReplyPosted?: () => void;
 }
 
+// Génère un fake trust score basé sur le handle (pour avoir un score cohérent par utilisateur)
+const getFakeTrustScore = (handle: string): number => {
+  let hash = 0;
+  for (let i = 0; i < handle.length; i++) {
+    hash = ((hash << 5) - hash) + handle.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash % 100);
+};
+
+// Retourne la couleur selon le score
+const getTrustScoreColor = (score: number): string => {
+  if (score >= 80) return "text-green-400";
+  if (score >= 60) return "text-lime-400";
+  if (score >= 40) return "text-yellow-400";
+  if (score >= 20) return "text-orange-400";
+  return "text-red-400";
+};
+
+// Retourne le background selon le score
+const getTrustScoreBg = (score: number): string => {
+  if (score >= 80) return "bg-green-400/10";
+  if (score >= 60) return "bg-lime-400/10";
+  if (score >= 40) return "bg-yellow-400/10";
+  if (score >= 20) return "bg-orange-400/10";
+  return "bg-red-400/10";
+};
+
+// Génère un fake trust score pour le contenu du post (basé sur le texte + URI)
+const getPostTrustScore = (text: string, uri: string): number => {
+  const combined = text + uri;
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    hash = ((hash << 5) - hash) + combined.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash % 100);
+};
+
+// Retourne le label selon le score
+const getTrustLabel = (score: number): string => {
+  if (score >= 80) return "Très fiable";
+  if (score >= 60) return "Fiable";
+  if (score >= 40) return "À vérifier";
+  if (score >= 20) return "Douteux";
+  return "Non fiable";
+};
+
 export default function PostCard({ post, reason, showReplyTo, onReplyPosted }: PostCardProps) {
   const navigate = useNavigate();
   const [liked, setLiked] = useState(!!post.viewer?.like);
@@ -558,99 +606,118 @@ export default function PostCard({ post, reason, showReplyTo, onReplyPosted }: P
   };
 
   // Action buttons component
-  const ActionButtons = ({ compact = false }: { compact?: boolean }) => (
-    <div className={`flex items-center ${compact ? "justify-around" : "justify-between max-w-[400px]"} text-gray-500`}>
-      {/* Reply */}
-      <button className="flex items-center gap-1.5 group" onClick={handleReply}>
-        <div className="p-2 rounded-full group-hover:bg-[#0085ff]/10 group-hover:text-[#0085ff] transition">
-          <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        </div>
-        {replyCount > 0 && <span className="text-[13px] group-hover:text-[#0085ff]">{formatNumber(replyCount)}</span>}
-      </button>
-
-      {/* Repost */}
-      <button
-        onClick={handleRepost}
-        className={`flex items-center gap-1.5 group ${reposted ? "text-[#00ba7c]" : ""}`}
-      >
-        <div className={`p-2 rounded-full transition ${
-          reposted ? "text-[#00ba7c]" : "group-hover:bg-[#00ba7c]/10 group-hover:text-[#00ba7c]"
-        }`}>
-          <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </div>
-        {repostCount > 0 && (
-          <span className={`text-[13px] ${reposted ? "text-[#00ba7c]" : "group-hover:text-[#00ba7c]"}`}>
-            {formatNumber(repostCount)}
-          </span>
-        )}
-      </button>
-
-      {/* Like */}
-      <button
-        onClick={handleLike}
-        className={`flex items-center gap-1.5 group ${liked ? "text-[#f91880]" : ""}`}
-      >
-        <div className={`p-2 rounded-full transition ${
-          liked ? "text-[#f91880]" : "group-hover:bg-[#f91880]/10 group-hover:text-[#f91880]"
-        }`}>
-          <svg
-            className="w-[18px] h-[18px]"
-            fill={liked ? "currentColor" : "none"}
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </div>
-        {likeCount > 0 && (
-          <span className={`text-[13px] ${liked ? "text-[#f91880]" : "group-hover:text-[#f91880]"}`}>
-            {formatNumber(likeCount)}
-          </span>
-        )}
-      </button>
-
-      {/* Save */}
-      <button
-        onClick={handleSave}
-        className={`flex items-center group ${saved ? "text-[#0085ff]" : ""}`}
-      >
-        <div className={`p-2 rounded-full transition ${
-          saved ? "text-[#0085ff]" : "group-hover:bg-[#0085ff]/10 group-hover:text-[#0085ff]"
-        }`}>
-          <svg
-            className="w-[18px] h-[18px]"
-            fill={saved ? "currentColor" : "none"}
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-          </svg>
-        </div>
-      </button>
-
-      {/* Share */}
-      <div className="relative" ref={shareMenuRef}>
-        <button 
-          className="flex items-center group"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowShareMenu(!showShareMenu);
-          }}
-        >
+  const ActionButtons = ({ compact = false }: { compact?: boolean }) => {
+    const postTrustScore = getPostTrustScore(post.record.text || "", post.uri);
+    
+    return (
+    <div className={`flex items-center ${compact ? "justify-around" : "justify-between"} text-gray-500`}>
+      <div className={`flex items-center ${compact ? "justify-around flex-1" : "justify-between max-w-[400px] flex-1"}`}>
+        {/* Reply */}
+        <button className="flex items-center gap-1.5 group" onClick={handleReply}>
           <div className="p-2 rounded-full group-hover:bg-[#0085ff]/10 group-hover:text-[#0085ff] transition">
             <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
+          {replyCount > 0 && <span className="text-[13px] group-hover:text-[#0085ff]">{formatNumber(replyCount)}</span>}
+        </button>
+
+        {/* Repost */}
+        <button
+          onClick={handleRepost}
+          className={`flex items-center gap-1.5 group ${reposted ? "text-[#00ba7c]" : ""}`}
+        >
+          <div className={`p-2 rounded-full transition ${
+            reposted ? "text-[#00ba7c]" : "group-hover:bg-[#00ba7c]/10 group-hover:text-[#00ba7c]"
+          }`}>
+            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </div>
+          {repostCount > 0 && (
+            <span className={`text-[13px] ${reposted ? "text-[#00ba7c]" : "group-hover:text-[#00ba7c]"}`}>
+              {formatNumber(repostCount)}
+            </span>
+          )}
+        </button>
+
+        {/* Like */}
+        <button
+          onClick={handleLike}
+          className={`flex items-center gap-1.5 group ${liked ? "text-[#f91880]" : ""}`}
+        >
+          <div className={`p-2 rounded-full transition ${
+            liked ? "text-[#f91880]" : "group-hover:bg-[#f91880]/10 group-hover:text-[#f91880]"
+          }`}>
+            <svg
+              className="w-[18px] h-[18px]"
+              fill={liked ? "currentColor" : "none"}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+          </div>
+          {likeCount > 0 && (
+            <span className={`text-[13px] ${liked ? "text-[#f91880]" : "group-hover:text-[#f91880]"}`}>
+              {formatNumber(likeCount)}
+            </span>
+          )}
+        </button>
+
+        {/* Save */}
+        <button
+          onClick={handleSave}
+          className={`flex items-center group ${saved ? "text-[#0085ff]" : ""}`}
+        >
+          <div className={`p-2 rounded-full transition ${
+            saved ? "text-[#0085ff]" : "group-hover:bg-[#0085ff]/10 group-hover:text-[#0085ff]"
+          }`}>
+            <svg
+              className="w-[18px] h-[18px]"
+              fill={saved ? "currentColor" : "none"}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
             </svg>
           </div>
         </button>
-        {showShareMenu && <ShareMenu />}
+
+        {/* Share */}
+        <div className="relative" ref={shareMenuRef}>
+          <button 
+            className="flex items-center group"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowShareMenu(!showShareMenu);
+            }}
+          >
+            <div className="p-2 rounded-full group-hover:bg-[#0085ff]/10 group-hover:text-[#0085ff] transition">
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            </div>
+          </button>
+          {showShareMenu && <ShareMenu />}
+        </div>
+      </div>
+
+      {/* Post Trust Score */}
+      <div 
+        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${getTrustScoreBg(postTrustScore)} cursor-help`}
+        title={`${getTrustLabel(postTrustScore)} - Score de confiance du contenu`}
+      >
+        <svg className={`w-4 h-4 ${getTrustScoreColor(postTrustScore)}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+        <span className={`text-xs font-semibold ${getTrustScoreColor(postTrustScore)}`}>
+          {postTrustScore}%
+        </span>
       </div>
     </div>
-  );
+    );
+  };
 
   // Render images grid
   const renderImages = (imageList: any[], maxHeight = "285px") => {
@@ -777,6 +844,14 @@ export default function PostCard({ post, reason, showReplyTo, onReplyPosted }: P
                 <span className="text-gray-500 hover:underline text-sm">
                   {formatDate(post.record.createdAt)}
                 </span>
+                {/* Trust Score Badge AFTER date */}
+                <span className="text-gray-500">·</span>
+                <span 
+                  className={`text-xs font-medium px-1.5 py-0.5 rounded ${getTrustScoreColor(getFakeTrustScore(post.author.handle))} ${getTrustScoreBg(getFakeTrustScore(post.author.handle))}`}
+                  title="Trust Score Utilisateur"
+                >
+                  🛡️ {getFakeTrustScore(post.author.handle)}%
+                </span>
               </div>
               
               {/* More menu */}
@@ -871,6 +946,14 @@ export default function PostCard({ post, reason, showReplyTo, onReplyPosted }: P
               <span className="text-gray-500">·</span>
               <span className="text-gray-500 hover:underline text-sm">
                 {formatDate(post.record.createdAt)}
+              </span>
+              {/* Trust Score Badge AFTER date */}
+              <span className="text-gray-500">·</span>
+              <span 
+                className={`text-xs font-medium px-1.5 py-0.5 rounded ${getTrustScoreColor(getFakeTrustScore(post.author.handle))} ${getTrustScoreBg(getFakeTrustScore(post.author.handle))}`}
+                title="Trust Score Utilisateur"
+              >
+                🛡️ {getFakeTrustScore(post.author.handle)}%
               </span>
             </div>
             
