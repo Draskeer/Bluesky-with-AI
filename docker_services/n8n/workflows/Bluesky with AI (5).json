@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Récupérer les données d'entrée\nconst items = $input.all();\n\n// Traiter chaque élément\nreturn items.map(item => {\n  const body = item.json.body || item.json;\n  \n  // Liste des champs requis\n  const champsRequis = ['message', 'user'];\n  const champsManquants = [];\n  \n  // Vérifier chaque champ requis\n  champsRequis.forEach(champ => {\n    if (!body[champ]) {\n      champsManquants.push(champ);\n    }\n  });\n  \n  // Si des champs manquent, lever une erreur\n  if (champsManquants.length > 0) {\n    const nbManquants = champsManquants.length;\n    const message = `Il manque ${nbManquants} champ${nbManquants > 1 ? 's' : ''} : ${champsManquants.join(', ')}`;\n    throw new Error(message);\n  }\n  \n  // Si tout est OK, retourner les données\n  return $input.first().json.body\n});"
+        "jsCode": "// Récupérer les données d'entrée\nconst items = $input.all();\n\n// Traiter chaque élément\nreturn items.map(item => {\n  const body = item.json.body || item.json;\n  \n  // Liste des champs requis\n  const champsRequis = ['message', 'user', 'msg_id'];\n  const champsManquants = [];\n  \n  // Vérifier chaque champ requis\n  champsRequis.forEach(champ => {\n    if (!body[champ]) {\n      champsManquants.push(champ);\n    }\n  });\n  \n  // Si des champs manquent, lever une erreur\n  if (champsManquants.length > 0) {\n    const nbManquants = champsManquants.length;\n    const message = `Il manque ${nbManquants} champ${nbManquants > 1 ? 's' : ''} : ${champsManquants.join(', ')}`;\n    throw new Error(message);\n  }\n  \n  // Si tout est OK, retourner les données\n  return $input.first().json.body\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -69,7 +69,7 @@
       "typeVersion": 4.3,
       "position": [
         -112,
-        -240
+        -192
       ],
       "id": "b5fd38a6-917c-4ea1-8d0f-a46bd1eae670",
       "name": "IsBot"
@@ -96,7 +96,7 @@
       "typeVersion": 2,
       "position": [
         64,
-        -240
+        -192
       ],
       "id": "72245d51-dcfd-4a1a-9ba3-81296b6da7ab",
       "name": "Output Verification1",
@@ -232,8 +232,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        400,
-        -272
+        256,
+        -192
       ],
       "id": "0a014122-f0eb-4ab0-a36c-5cee0c717bf4",
       "name": "Write In DB"
@@ -301,11 +301,32 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1,
       "position": [
-        704,
-        -400
+        272,
+        -416
       ],
       "id": "1c22c105-aabc-4cc5-bd43-e4b90f959501",
       "name": "Infos Logger1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO messages(message_id, is_fake, confidence)\nVALUES ({{ $('Data Verification').item.json.msg_id }}, {{ $('Output Verification').item.json.is_real_news }}, {{ $('Output Verification').item.json.confidence }})",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        496,
+        -416
+      ],
+      "id": "86b8ba1b-7c5b-477c-a624-5e668fae6cb7",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "AjUxu8oW8xTpjjAF",
+          "name": "Postgres account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -412,15 +433,27 @@
           }
         ]
       ]
+    },
+    "Infos Logger1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "668f2348-08b2-4c73-8160-4b4265022552",
+  "versionId": "745e3dde-11c3-4ecb-aee9-b2537cf3cd41",
   "meta": {
-    "instanceId": "409386467393596bb006bd03e641ddf2b4a97d29910b5efaf961732d1fde95e5"
+    "instanceId": "409386467393596bb006bd03e641ddf2b4a97d29910b5efaf961732d1fde95e5",
+    "templateCredsSetupCompleted": true
   },
   "id": "mIrGZNk4zk0WCqbH",
   "tags": []

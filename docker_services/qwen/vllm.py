@@ -81,13 +81,7 @@ async def chat_completion(request: ChatRequest):
     response_text = response_text.split("Assistant:")[-1].strip()
 
     return ChatResponse(
-        choices=[
-            {
-                "index": 0,
-                "message": {"role": "assistant", "content": response_text},
-                "finish_reason": "stop",
-            }
-        ],
+        choices=[{"index": 0, "output": {response_text}}],
     )
 
 
