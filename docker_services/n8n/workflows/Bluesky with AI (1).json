@@ -1,0 +1,403 @@
+{
+  "name": "Bluesky with AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "0dde0006-a389-47f5-ae16-caeae58037bc",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -544,
+        -112
+      ],
+      "id": "cfbabb7b-ec45-42da-be59-4c090c13cc69",
+      "name": "Webhook",
+      "webhookId": "0dde0006-a389-47f5-ae16-caeae58037bc"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        -112
+      ],
+      "id": "e9a086e4-218a-4db7-ae9a-4fe001fb7d79",
+      "name": "Data Verification",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://llm-server:8000/v1/chat/completions",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "Qwen/Qwen2.5-0.5B"
+            },
+            {
+              "name": "message",
+              "value": "={{ $('Webhook').item.json.body.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -112,
+        -400
+      ],
+      "id": "2aa2001d-3f13-4727-971e-febcd05286a0",
+      "name": "IsFakeNews"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://llm-server:8000/v1/chat/completions",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -112,
+        -240
+      ],
+      "id": "b5fd38a6-917c-4ea1-8d0f-a46bd1eae670",
+      "name": "IsBot"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        -400
+      ],
+      "id": "d24c8dff-59cc-47f6-b871-310ba08086be",
+      "name": "Output Verification",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        -240
+      ],
+      "id": "72245d51-dcfd-4a1a-9ba3-81296b6da7ab",
+      "name": "Output Verification1",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "ar1NQ5pIXsSlBjjr",
+          "mode": "list",
+          "cachedResultName": "Execution Infos",
+          "cachedResultUrl": "/projects/SCkLiGdNcpiddJHR/datatables/ar1NQ5pIXsSlBjjr"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Running"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Exe_Input",
+              "displayName": "Exe_Input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        32
+      ],
+      "id": "9e85ef43-c479-41e4-b276-6bcb4403ba0a",
+      "name": "Infos Logger"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "NatEuXcPKILe0pnO",
+          "mode": "list",
+          "cachedResultName": "Errors",
+          "cachedResultUrl": "/projects/SCkLiGdNcpiddJHR/datatables/NatEuXcPKILe0pnO"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Step",
+              "displayName": "Step",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Error",
+              "displayName": "Error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Last_Output",
+              "displayName": "Last_Output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        288,
+        -96
+      ],
+      "id": "cb99670f-8c53-4a81-9f72-ef07dcc1aa99",
+      "name": "Errors Logger"
+    },
+    {
+      "parameters": {
+        "url": "http://llm-server:8000/v1/chat/completions",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        288,
+        -240
+      ],
+      "id": "0a014122-f0eb-4ab0-a36c-5cee0c717bf4",
+      "name": "Write In DB"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ar1NQ5pIXsSlBjjr",
+          "mode": "list",
+          "cachedResultName": "Execution Infos",
+          "cachedResultUrl": "/projects/SCkLiGdNcpiddJHR/datatables/ar1NQ5pIXsSlBjjr"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Exe_Input",
+              "displayName": "Exe_Input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -240
+      ],
+      "id": "1c22c105-aabc-4cc5-bd43-e4b90f959501",
+      "name": "Infos Logger1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Data Verification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Infos Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Verification": {
+      "main": [
+        [
+          {
+            "node": "IsFakeNews",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IsBot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Errors Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IsBot": {
+      "main": [
+        [
+          {
+            "node": "Output Verification1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IsFakeNews": {
+      "main": [
+        [
+          {
+            "node": "Output Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Verification1": {
+      "main": [
+        [
+          {
+            "node": "Write In DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Errors Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Verification": {
+      "main": [
+        [
+          {
+            "node": "Write In DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Errors Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write In DB": {
+      "main": [
+        [
+          {
+            "node": "Infos Logger1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "38fa05c7-d503-44c2-bcc0-fbff57f43482",
+  "meta": {
+    "instanceId": "409386467393596bb006bd03e641ddf2b4a97d29910b5efaf961732d1fde95e5"
+  },
+  "id": "mIrGZNk4zk0WCqbH",
+  "tags": []
+}
