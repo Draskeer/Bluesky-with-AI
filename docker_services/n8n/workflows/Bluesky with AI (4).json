@@ -10,7 +10,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -544,
+        -704,
         -112
       ],
       "id": "cfbabb7b-ec45-42da-be59-4c090c13cc69",
@@ -19,12 +19,12 @@
     },
     {
       "parameters": {
-        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+        "jsCode": "// Récupérer les données d'entrée\nconst items = $input.all();\n\n// Traiter chaque élément\nreturn items.map(item => {\n  const body = item.json.body || item.json;\n  \n  // Liste des champs requis\n  const champsRequis = ['message', 'user'];\n  const champsManquants = [];\n  \n  // Vérifier chaque champ requis\n  champsRequis.forEach(champ => {\n    if (!body[champ]) {\n      champsManquants.push(champ);\n    }\n  });\n  \n  // Si des champs manquent, lever une erreur\n  if (champsManquants.length > 0) {\n    const nbManquants = champsManquants.length;\n    const message = `Il manque ${nbManquants} champ${nbManquants > 1 ? 's' : ''} : ${champsManquants.join(', ')}`;\n    throw new Error(message);\n  }\n  \n  // Si tout est OK, retourner les données\n  return $input.first().json.body\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -320,
+        -544,
         -112
       ],
       "id": "e9a086e4-218a-4db7-ae9a-4fe001fb7d79",
@@ -44,7 +44,7 @@
             },
             {
               "name": "message",
-              "value": "={{ $('Webhook').item.json.body.message }}"
+              "value": "={{ $('Data Verification').item.json.message }}"
             }
           ]
         },
@@ -76,7 +76,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+        "jsCode": "// Récupérer les données d'entrée\nconst items = $input.all();\n\nreturn items.map(item => {\n  try {\n    // Extraire la réponse de l'IA\n    const choices = item.json.choices;\n    \n    if (!choices || !choices[0] || !choices[0].output || !choices[0].output[0]) {\n      throw new Error(\"Structure de réponse invalide : impossible de trouver choices[0].output[0]\");\n    }\n    \n    // Parser le JSON de la réponse\n    const responseText = choices[0].output[0];\n    const parsedResponse = JSON.parse(responseText);\n    \n    // Vérifier les champs requis\n    const champsManquants = [];\n    \n    if (parsedResponse.is_real_news === undefined) {\n      champsManquants.push('is_real_news');\n    }\n    \n    if (parsedResponse.confidence === undefined) {\n      champsManquants.push('confidence');\n    }\n    \n    // Si des champs manquent, lever une erreur\n    if (champsManquants.length > 0) {\n      throw new Error(`Il manque ${champsManquants.length} champ(s) : ${champsManquants.join(', ')}`);\n    }\n    \n    // Retourner les données validées\n    return {\n      json: {\n        is_real_news: parsedResponse.is_real_news,\n        confidence: parsedResponse.confidence\n      }\n    };\n    \n  } catch (error) {\n    throw new Error(`Erreur de validation : ${error.message}`);\n  }\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -106,21 +106,23 @@
       "parameters": {
         "dataTableId": {
           "__rl": true,
-          "value": "ar1NQ5pIXsSlBjjr",
+          "value": "rqrEG335i7KYQrnO",
           "mode": "list",
-          "cachedResultName": "Execution Infos",
-          "cachedResultUrl": "/projects/SCkLiGdNcpiddJHR/datatables/ar1NQ5pIXsSlBjjr"
+          "cachedResultName": "Executions Infos",
+          "cachedResultUrl": "/projects/xVIk7UvWsHSTJ0bH/datatables/rqrEG335i7KYQrnO"
         },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "Status": "Running"
+            "status": "In Progress",
+            "message": "={{ $json.message }}",
+            "user": "={{ $json.user }}"
           },
           "matchingColumns": [],
           "schema": [
             {
-              "id": "Exe_Input",
-              "displayName": "Exe_Input",
+              "id": "status",
+              "displayName": "status",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -129,8 +131,18 @@
               "removed": false
             },
             {
-              "id": "Status",
-              "displayName": "Status",
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "user",
+              "displayName": "user",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -147,8 +159,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1,
       "position": [
-        -320,
-        32
+        -352,
+        -208
       ],
       "id": "9e85ef43-c479-41e4-b276-6bcb4403ba0a",
       "name": "Infos Logger"
@@ -207,7 +219,7 @@
       "typeVersion": 1,
       "position": [
         288,
-        -96
+        -48
       ],
       "id": "cb99670f-8c53-4a81-9f72-ef07dcc1aa99",
       "name": "Errors Logger"
@@ -220,8 +232,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        288,
-        -240
+        400,
+        -272
       ],
       "id": "0a014122-f0eb-4ab0-a36c-5cee0c717bf4",
       "name": "Write In DB"
@@ -231,21 +243,28 @@
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "value": "ar1NQ5pIXsSlBjjr",
+          "value": "rqrEG335i7KYQrnO",
           "mode": "list",
-          "cachedResultName": "Execution Infos",
-          "cachedResultUrl": "/projects/SCkLiGdNcpiddJHR/datatables/ar1NQ5pIXsSlBjjr"
+          "cachedResultName": "Executions Infos",
+          "cachedResultUrl": "/projects/xVIk7UvWsHSTJ0bH/datatables/rqrEG335i7KYQrnO"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $('Infos Logger').item.json.id }}"
+            }
+          ]
         },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "Status": "Success"
+            "status": "Success"
           },
           "matchingColumns": [],
           "schema": [
             {
-              "id": "Exe_Input",
-              "displayName": "Exe_Input",
+              "id": "status",
+              "displayName": "status",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -254,8 +273,18 @@
               "removed": false
             },
             {
-              "id": "Status",
-              "displayName": "Status",
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "user",
+              "displayName": "user",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -272,8 +301,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1,
       "position": [
-        464,
-        -240
+        704,
+        -400
       ],
       "id": "1c22c105-aabc-4cc5-bd43-e4b90f959501",
       "name": "Infos Logger1"
@@ -288,11 +317,6 @@
             "node": "Data Verification",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Infos Logger",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -301,12 +325,7 @@
       "main": [
         [
           {
-            "node": "IsFakeNews",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "IsBot",
+            "node": "Infos Logger",
             "type": "main",
             "index": 0
           }
@@ -364,7 +383,7 @@
       "main": [
         [
           {
-            "node": "Write In DB",
+            "node": "Infos Logger1",
             "type": "main",
             "index": 0
           }
@@ -380,9 +399,14 @@
     },
     "Write In DB": {
       "main": [
+        []
+      ]
+    },
+    "Infos Logger": {
+      "main": [
         [
           {
-            "node": "Infos Logger1",
+            "node": "IsFakeNews",
             "type": "main",
             "index": 0
           }
@@ -394,7 +418,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "38fa05c7-d503-44c2-bcc0-fbff57f43482",
+  "versionId": "668f2348-08b2-4c73-8160-4b4265022552",
   "meta": {
     "instanceId": "409386467393596bb006bd03e641ddf2b4a97d29910b5efaf961732d1fde95e5"
   },
