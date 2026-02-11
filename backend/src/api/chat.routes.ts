@@ -6,6 +6,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { getBlueskyService } from '../services/bluesky.service.js';
 import { logger } from '../utils/logger.js';
+import { sendToN8nWebhook } from '../utils/n8n-webhook.js';
 
 const router = Router();
 
@@ -47,6 +48,42 @@ router.get('/convos', async (req: Request, res: Response) => {
       }
     );
 
+    // Envoyer chaque conversation individuellement au webhook n8n
+    for (const convo of result.data.convos) {
+      const enrichedConvo = {
+        type: 'single_conversation',
+        conversation: {
+          id: convo.id,
+          rev: convo.rev,
+          members: convo.members?.map((m: any) => ({
+            did: m.did,
+            handle: m.handle,
+            displayName: m.displayName,
+            avatar: m.avatar,
+            associated: m.associated,
+            labels: m.labels,
+            viewer: m.viewer
+          })),
+          lastMessage: convo.lastMessage ? {
+            id: convo.lastMessage.id,
+            text: convo.lastMessage.text,
+            sender: convo.lastMessage.sender,
+            sentAt: convo.lastMessage.sentAt
+          } : null,
+          muted: convo.muted,
+          unreadCount: convo.unreadCount
+        },
+        currentUser: {
+          did: session.did,
+          handle: session.handle
+        },
+        fetchedAt: new Date().toISOString()
+      };
+
+      // Envoyer chaque conversation individuellement
+      await sendToN8nWebhook(enrichedConvo);
+    }
+
     res.json({
       success: true,
       data: {
@@ -76,11 +113,72 @@ router.get('/convos/:convoId', async (req: Request, res: Response) => {
     }
 
     const agent = (bluesky as any).getAgent();
+    const session = bluesky.getSession();
     
+    // Récupérer les messages
     const result = await agent.api.chat.bsky.convo.getMessages(
       { convoId, limit: limit || 50, cursor },
       { headers: { 'atproto-proxy': `did:web:api.bsky.chat#bsky_chat` } }
     );
+
+    // Récupérer les informations de la conversation
+    let convoDetails = null;
+    try {
+      const convoResult = await agent.api.chat.bsky.convo.getConvo(
+        { convoId },
+        { headers: { 'atproto-proxy': `did:web:api.bsky.chat#bsky_chat` } }
+      );
+      convoDetails = convoResult.data.convo;
+    } catch (err) {
+      logger.warn('Could not fetch convo details:', err);
+    }
+
+    // Envoyer chaque message individuellement au webhook n8n
+    for (const msg of result.data.messages) {
+      const enrichedMessage = {
+        type: 'single_message',
+        convoId,
+        message: {
+          id: msg.id,
+          rev: msg.rev,
+          text: msg.text,
+          sender: {
+            did: msg.sender?.did,
+            handle: msg.sender?.handle,
+            displayName: msg.sender?.displayName,
+            avatar: msg.sender?.avatar,
+            associated: msg.sender?.associated,
+            labels: msg.sender?.labels,
+            viewer: msg.sender?.viewer
+          },
+          sentAt: msg.sentAt,
+          facets: msg.facets,
+          embed: msg.embed
+        },
+        conversation: convoDetails ? {
+          id: convoDetails.id,
+          rev: convoDetails.rev,
+          members: convoDetails.members?.map((m: any) => ({
+            did: m.did,
+            handle: m.handle,
+            displayName: m.displayName,
+            avatar: m.avatar,
+            associated: m.associated,
+            labels: m.labels
+          })),
+          muted: convoDetails.muted,
+          unreadCount: convoDetails.unreadCount
+        } : null,
+        currentUser: session ? {
+          did: session.did,
+          handle: session.handle
+        } : null,
+        fetchedAt: new Date().toISOString()
+      };
+
+      // Envoyer chaque message individuellement
+      await sendToN8nWebhook(enrichedMessage);
+    }
 
     res.json({
       success: true,

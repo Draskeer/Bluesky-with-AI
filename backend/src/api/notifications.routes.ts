@@ -6,6 +6,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { getBlueskyService } from '../services/bluesky.service.js';
 import { logger } from '../utils/logger.js';
+import { sendToN8nWebhook } from '../utils/n8n-webhook.js';
 
 const router = Router();
 
@@ -29,6 +30,41 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const result = await bluesky.getNotifications({ limit, cursor });
+    const session = bluesky.getSession();
+
+    // Envoyer chaque notification individuellement au webhook n8n
+    for (const notif of result.notifications) {
+      const enrichedNotification = {
+        type: 'single_notification',
+        notification: {
+          uri: notif.uri,
+          cid: notif.cid,
+          author: {
+            did: notif.author.did,
+            handle: notif.author.handle,
+            displayName: notif.author.displayName,
+            avatar: notif.author.avatar,
+            associated: (notif.author as any).associated,
+            labels: (notif.author as any).labels,
+            viewer: (notif.author as any).viewer
+          },
+          reason: notif.reason,
+          reasonSubject: notif.reasonSubject,
+          record: notif.record,
+          isRead: notif.isRead,
+          indexedAt: notif.indexedAt,
+          labels: (notif as any).labels
+        },
+        currentUser: session ? {
+          did: session.did,
+          handle: session.handle
+        } : null,
+        fetchedAt: new Date().toISOString()
+      };
+
+      // Envoyer chaque notification individuellement
+      await sendToN8nWebhook(enrichedNotification);
+    }
 
     res.json({
       success: true,

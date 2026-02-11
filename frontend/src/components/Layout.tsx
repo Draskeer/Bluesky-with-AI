@@ -8,11 +8,22 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+type Mood = 'happy' | 'good' | 'neutral' | 'low' | 'sad';
+
 export default function Layout({ children }: LayoutProps) {
   const { profile, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const location = useLocation();
   const [showComposeModal, setShowComposeModal] = useState(false);
+  const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
+
+  const moods: { value: Mood; emoji: string; label: string; color: string }[] = [
+    { value: 'happy', emoji: '😊', label: 'Happy', color: 'hover:bg-green-500/20 hover:border-green-500' },
+    { value: 'good', emoji: '🙂', label: 'Good', color: 'hover:bg-blue-500/20 hover:border-blue-500' },
+    { value: 'neutral', emoji: '😐', label: 'Neutral', color: 'hover:bg-gray-500/20 hover:border-gray-500' },
+    { value: 'low', emoji: '😔', label: 'Low', color: 'hover:bg-orange-500/20 hover:border-orange-500' },
+    { value: 'sad', emoji: '😢', label: 'Sad', color: 'hover:bg-red-500/20 hover:border-red-500' }
+  ];
 
   const handleLogout = () => {
     logout();
@@ -167,6 +178,29 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Right Sidebar */}
         <aside className="hidden xl:block w-[350px] p-4 flex-shrink-0">
+          {/* Today's Mood */}
+          <div className="bg-[#1c2938] rounded-2xl p-3 border border-[#2f3e4e] mb-4">
+            <h2 className="text-white font-bold text-sm mb-2">Today's mood</h2>
+            <div className="flex justify-between gap-1.5">
+              {moods.map((mood) => (
+                <button
+                  key={mood.value}
+                  onClick={() => setSelectedMood(selectedMood === mood.value ? null : mood.value)}
+                  className={`flex-1 flex flex-col items-center gap-0.5 p-2 rounded-lg border-2 transition-all ${
+                    selectedMood === mood.value
+                      ? 'border-[#1da1f2] bg-[#1da1f2]/10'
+                      : `border-[#2f3e4e] ${mood.color}`
+                  }`}
+                  title={mood.label}
+                >
+                  <span className="text-xl">{mood.emoji}</span>
+                  <span className="text-[10px] text-[#8899a6] font-medium">{mood.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Trending */}
           <div className="bg-[#1c2938] rounded-2xl overflow-hidden mb-4">
             <div className="p-4 border-b border-[#2f3e4e]">
               <h2 className="text-white font-extrabold text-xl">Trending</h2>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../services/api";
 
@@ -24,22 +24,31 @@ interface Notification {
 export default function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(true);
+  
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (reset = false) => {
     try {
-      setLoading(true);
-      const response = await api.notifications.list({ limit: 50 });
+      if (reset) {
+        setLoading(true);
+        setNotifications([]);
+        setCursor(undefined);
+      }
+
+      const response = await api.notifications.list({ limit: 25 });
 
       if (!response.success || !response.data) {
         throw new Error(response.error || "Failed to load notifications");
       }
 
       setNotifications(response.data.notifications || []);
+      setCursor(response.data.cursor);
+      setHasMore(!!response.data.cursor);
       
       // Mark notifications as read
       api.notifications.markRead();
@@ -49,6 +58,53 @@ export default function Notifications() {
       setLoading(false);
     }
   };
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !cursor) return;
+
+    try {
+      setLoadingMore(true);
+      const response = await api.notifications.list({ limit: 25, cursor });
+
+      if (response.success && response.data) {
+        setNotifications(prev => [...prev, ...(response.data.notifications || [])]);
+        setCursor(response.data.cursor);
+        setHasMore(!!response.data.cursor);
+      }
+    } catch (err) {
+      console.error("Erreur lors du chargement:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [cursor, hasMore, loadingMore]);
+
+  useEffect(() => {
+    fetchNotifications(true);
+  }, []);
+
+  // Intersection Observer pour le scroll infini
+  useEffect(() => {
+    if (loading || !hasMore) return;
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [loadMore, hasMore, loading, loadingMore]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -174,7 +230,7 @@ export default function Notifications() {
         <div className="px-4 py-8 text-center">
           <p className="text-[#e0245e] mb-4">{error}</p>
           <button
-            onClick={fetchNotifications}
+            onClick={() => fetchNotifications(true)}
             className="text-[#0085ff] hover:underline font-bold"
           >
             Try again
@@ -232,6 +288,21 @@ export default function Notifications() {
               </div>
             </Link>
           ))}
+          
+          {/* Sentinel pour le scroll infini */}
+          {hasMore && (
+            <div ref={loadMoreRef} className="flex justify-center py-8">
+              {loadingMore && (
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0085ff]"></div>
+              )}
+            </div>
+          )}
+          
+          {!hasMore && notifications.length > 0 && (
+            <div className="px-4 py-8 text-center text-[#8899a6]">
+              <p className="text-sm">Vous avez tout vu ! 🎉</p>
+            </div>
+          )}
         </div>
       )}
     </div>

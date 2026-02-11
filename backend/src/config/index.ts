@@ -18,6 +18,9 @@ const configSchema = z.object({
   // Bluesky
   BLUESKY_SERVICE_URL: z.string().default('https://bsky.social'),
   
+  // N8N Webhook
+  N8N_WEBHOOK_URL: z.string().optional(),
+  
   // Analyse
   ANALYSIS_PARALLEL: z.coerce.boolean().default(true),
   ANALYSIS_MAX_CONCURRENT: z.coerce.number().default(10),
