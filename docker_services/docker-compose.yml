@@ -98,7 +98,7 @@ services:
         echo "  Puis copiez le contenu dans ./n8n/entities/"
     restart: "no"
 
-  # Base de données PostgreSQL
+  # Base de données PostgreSQL pour n8n
   postgres:
     image: postgres:16-alpine
     container_name: postgres
@@ -119,6 +119,45 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Base de données PostgreSQL pour le stockage des données traités
+  postgres-data:
+    image: timescale/timescaledb:latest-pg16
+    container_name: db_bluesky_data
+    restart: always
+    environment:
+      - POSTGRES_USER=bluesky
+      - POSTGRES_PASSWORD=bluesky_secret
+      - POSTGRES_DB=bluesky_data
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-bluesky-data:/var/lib/postgresql/data
+      # On monte spécifiquement le fichier init_bluesky.sql
+      - ./postgres/init/init_bluesky.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - llm-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bluesky_admin -d bluesky_data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Interface Graphique (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: bluesky_pgadmin
+    restart: always
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@bluesky.local
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - llm-network
 
 networks:
   llm-network:
