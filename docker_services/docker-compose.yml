@@ -13,7 +13,7 @@ services:
       bash -c "
       apt-get update && 
       apt-get install -y python3 python3-pip &&
-      pip3 install --break-system-packages fastapi uvicorn transformers torch &&
+      pip3 install --break-system-packages fastapi uvicorn transformers torch sentence-transformers &&
       python3 qwen/vllm.py
       "
     networks:
@@ -119,6 +119,39 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+    networks:
+      - llm-network
+
+  # Initialisation Qdrant (création collection + index)
+  qdrant-init:
+    image: curlimages/curl:8.6.0
+    container_name: qdrant-init
+    volumes:
+      - ./qwen/init.sh:/app/qwen/init.sh:ro
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+    networks:
+      - llm-network
+    depends_on:
+      - qdrant
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Qdrant..."
+        until curl -sS http://qdrant:6333/healthz >/dev/null; do sleep 1; done
+        /app/qwen/init.sh
+    restart: "no"
 
   # Base de données PostgreSQL pour le stockage des données traités
   postgres-data:
@@ -167,3 +200,4 @@ volumes:
   llm-models:
   n8n-data:
   postgres-data:
+  qdrant_data:
