@@ -122,15 +122,18 @@ services:
   
   
   qdrant:
-    image: qdrant/qdrant
+    image: qdrant/qdrant:latest
+    container_name: qdrant
     ports:
       - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
       - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
     networks:
       - llm-network
+    restart: unless-stopped
 
   # Initialisation Qdrant (création collection + index)
   qdrant-init:
@@ -192,6 +195,25 @@ services:
     networks:
       - llm-network
 
+  # News Getter - Service pour récupérer et indexer les articles
+  news_getter:
+    build: ./news_getter
+    container_name: news_getter
+    env_file:
+      - .env
+    environment:
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      # INTERVAL_MINUTES: "150"  # 2.5h by default, override if needed
+    volumes:
+      - news_data:/data
+    depends_on:
+      - qdrant
+    networks:
+      - llm-network
+    restart: unless-stopped
+
 networks:
   llm-network:
     driver: bridge
@@ -201,3 +223,5 @@ volumes:
   n8n-data:
   postgres-data:
   qdrant_data:
+  postgres-bluesky-data:
+  news_data:
