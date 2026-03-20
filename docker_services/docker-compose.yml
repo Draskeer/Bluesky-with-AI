@@ -179,22 +179,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Interface Graphique (pgAdmin)
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: bluesky_pgadmin
-    restart: always
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@bluesky.local
-      - PGADMIN_DEFAULT_PASSWORD=admin
-    ports:
-      - "5050:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - llm-network
-
   # News Getter - Service pour récupérer et indexer les articles
   news_getter:
     build: ./news_getter
