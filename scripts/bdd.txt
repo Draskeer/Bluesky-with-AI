@@ -1,0 +1,31 @@
+Script en continue
+
+PGAdmin sur ce lien
+
+http://localhost:5050
+
+admin@bluesky.com
+
+admin
+
+BDD 
+bluesky_data 
+
+TABLE
+raw_post_pointers
+
+
+config PGAdmin
+
+
+Host name/address : Bluesky_Server
+
+Port : 5432
+
+Maintenance database : bluesky_data
+
+Username : bluesky
+
+Password : bluesky_secret
+
+et save password

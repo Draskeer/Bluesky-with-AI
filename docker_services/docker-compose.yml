@@ -174,7 +174,7 @@ services:
     networks:
       - llm-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bluesky_admin -d bluesky_data"]
+      test: ["CMD-SHELL", "pg_isready -U bluesky -d bluesky_data"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -198,6 +198,24 @@ services:
       - llm-network
     restart: unless-stopped
 
+  # Interface d'administration web pour PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@bluesky.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - llm-network
+    depends_on:
+      - postgres
+      - postgres-data
+    restart: unless-stopped
+
 networks:
   llm-network:
     driver: bridge
@@ -209,3 +227,4 @@ volumes:
   qdrant_data:
   postgres-bluesky-data:
   news_data:
+  pgadmin-data:
