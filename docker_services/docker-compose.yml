@@ -34,6 +34,11 @@ services:
     environment:
       - PORT=8002
       - TORCH_THREADS=2
+      # Seuils NLI resserrés pour éviter les faux positifs (entailment partiel sur contexte)
+      - ENTAIL_SOFT=0.65   # était 0.50 — un article "soutient" le claim seulement si entailment fort
+      - CORRO_MIN=4        # était 3 — il faut 4 sources concordantes pour conclure "real"
+      - NLI_HI=0.75        # était 0.70 — seuil pour trancher fake/real
+      - ENABLE_LLM_ESCALATION=true
     command: >
       sh -c "
       pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu &&
