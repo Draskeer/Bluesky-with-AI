@@ -3,6 +3,13 @@ node_modules/
 .pnp/
 .pnp.js
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
 # Build outputs
 dist/
 build/
