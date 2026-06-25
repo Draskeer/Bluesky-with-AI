@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
+import type { AiAnalysis, Mood } from "../services/api";
+import { usePostAiAnalysis } from "../hooks/usePostAiAnalysis";
 import ComposePost from "./ComposePost";
 import type { BlueskyPost, BlueskyProfile } from "../types";
 
@@ -14,7 +16,25 @@ interface PostCardProps {
   isReply?: boolean;
   showReplyTo?: BlueskyPost;
   onReplyPosted?: () => void;
+  /** Override optionnel : résultat d'analyse IA fourni par le parent. Si absent,
+   *  le composant déclenche lui-même l'analyse via usePostAiAnalysis. */
+  aiAnalysis?: AiAnalysis;
+  /** Override optionnel : relance l'analyse IA (si le parent gère l'analyse). */
+  onRetryAnalysis?: () => void;
 }
+
+// Normalise la confiance (le LLM peut renvoyer 0-1 ou 0-100) vers un pourcentage 0-100
+const toPercent = (confidence: number): number => {
+  const v = confidence <= 1 ? confidence * 100 : confidence;
+  return Math.max(0, Math.min(100, Math.round(v)));
+};
+
+// Emoji + libellé selon le mood
+const MOOD_DISPLAY: Record<Mood, { emoji: string; label: string }> = {
+  positive: { emoji: "😊", label: "Positif" },
+  neutral: { emoji: "😐", label: "Neutre" },
+  negative: { emoji: "😞", label: "Négatif" },
+};
 
 // Génère un fake trust score basé sur le handle (pour avoir un score cohérent par utilisateur)
 const getFakeTrustScore = (handle: string): number => {
@@ -64,8 +84,162 @@ const getTrustLabel = (score: number): string => {
   return "Non fiable";
 };
 
-export default function PostCard({ post, reason, showReplyTo, onReplyPosted }: PostCardProps) {
+/**
+ * Badge d'analyse IA affiché sous chaque post :
+ * - pas d'analyse + onStart -> bouton "Analyser" (lance le call n8n à la demande)
+ * - pas d'analyse sans onStart -> score factice (fallback, ex. réponses)
+ * - pending -> spinner "IA en cours"
+ * - failed  -> bouton "Relancer" (n8n indisponible / timeout)
+ * - done -> % de confiance (couleur), humeur, et alerte si contenu jugé "fake"
+ */
+function AiBadge({
+  analysis,
+  fallbackScore,
+  onStart,
+}: {
+  analysis?: AiAnalysis;
+  fallbackScore: number;
+  /** Lance (ou relance) l'analyse. Absent -> pas d'analyse possible (réponses). */
+  onStart?: () => void;
+}) {
+  // Aucune analyse : bouton "Analyser" si possible, sinon score factice (fallback)
+  if (!analysis) {
+    if (onStart) {
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onStart();
+          }}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#0085ff]/10 hover:bg-[#0085ff]/20 transition-colors"
+          title="Lancer l'analyse IA de ce post"
+        >
+          <svg className="w-4 h-4 text-[#0085ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <span className="text-xs font-semibold text-[#0085ff]">Analyser</span>
+        </button>
+      );
+    }
+    return (
+      <div
+        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${getTrustScoreBg(fallbackScore)} cursor-help`}
+        title={`${getTrustLabel(fallbackScore)} - Score de confiance du contenu`}
+      >
+        <svg className={`w-4 h-4 ${getTrustScoreColor(fallbackScore)}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+        <span className={`text-xs font-semibold ${getTrustScoreColor(fallbackScore)}`}>{fallbackScore}%</span>
+      </div>
+    );
+  }
+
+  // En cours d'analyse par n8n
+  if (analysis.status === "pending") {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#0085ff]/10 cursor-wait"
+        title="Analyse IA en cours…"
+      >
+        <svg className="w-4 h-4 text-[#0085ff] animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <span className="text-xs font-semibold text-[#0085ff]">🧠 IA…</span>
+      </div>
+    );
+  }
+
+  // Analyse échouée (n8n indisponible / timeout) -> bouton de relance
+  if (analysis.status === "failed") {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onStart?.();
+        }}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+        title="Analyse IA indisponible — cliquer pour relancer"
+      >
+        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <span className="text-xs font-semibold text-amber-500">Relancer</span>
+      </button>
+    );
+  }
+
+  // Analyse terminée. Le verdict est BASÉ SUR PREUVE (RAG + NLI) :
+  //   - is_fake=true            -> un article CONTREDIT le post  -> rouge "Fake X%"
+  //   - !is_fake & conf >= seuil -> un article SOUTIENT le post   -> vert "Vérifié X%"
+  //   - sinon (conf faible/0)    -> rien à vérifier / pas de preuve -> gris "Non vérifié"
+  // `confidence` = confiance du NLI dans le verdict, pas un score de fiabilité brut.
+  // Aligné sur le PLANCHER du verdict "real" du classifier (corroboration de sujet
+  // plafonnée à 0.60+) : sinon un post réellement corroboré à 60-69 % s'affichait
+  // "Non vérifié" alors que /verify l'avait jugé real.
+  const VERIFIED_MIN = 60;
+  const percent = toPercent(analysis.confidence);
+  const mood = analysis.mood ? MOOD_DISPLAY[analysis.mood] : null;
+  const moodSuffix = mood ? ` · Humeur : ${mood.label}` : "";
+
+  let state: "fake" | "verified" | "unverified";
+  if (analysis.is_fake) state = "fake";
+  else if (percent >= VERIFIED_MIN) state = "verified";
+  else state = "unverified";
+
+  const STYLE = {
+    fake: { bg: "bg-red-400/10", text: "text-red-400", label: `Fake ${percent}%`,
+      title: `⚠️ Probable fake — un article de référence contredit ce post (confiance ${percent}%)` },
+    verified: { bg: "bg-green-400/10", text: "text-green-400", label: `Vérifié ${percent}%`,
+      title: `✅ Cohérent avec une vraie actualité (confiance ${percent}%)` },
+    unverified: { bg: "bg-[#8899a6]/10", text: "text-[#8899a6]", label: `Non vérifié`,
+      title: `Aucune preuve trouvée dans la base d'actualités (ni confirmé, ni contredit)` },
+  }[state];
+
+  return (
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${STYLE.bg} cursor-help`} title={STYLE.title + moodSuffix}>
+      {state === "fake" ? (
+        <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+        </svg>
+      ) : state === "verified" ? (
+        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      ) : (
+        <svg className={`w-4 h-4 ${STYLE.text}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )}
+      <span className={`text-xs font-semibold ${STYLE.text}`}>{STYLE.label}</span>
+      {mood && <span className="text-xs" title={`Humeur : ${mood.label}`}>{mood.emoji}</span>}
+    </div>
+  );
+}
+
+export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPosted, aiAnalysis, onRetryAnalysis }: PostCardProps) {
   const navigate = useNavigate();
+
+  // Analyse IA portée par le composant : badge si déjà analysé (vérif lecture seule
+  // au montage), sinon bouton « Analyser » à la demande. Pas de call n8n pour les réponses.
+  const isReplyPost = isReply || !!post.record?.reply || !!showReplyTo;
+  // Posts sans texte (image seule, repost) : n8n rejette le message vide
+  // (nœud "Data Verification") -> pas d'analyse possible, on n'affiche pas le bouton.
+  const hasText = !!post.record?.text?.trim();
+  const canSelfAnalyze = !isReplyPost && !aiAnalysis && hasText;
+  const selfAnalysis = usePostAiAnalysis(post, canSelfAnalyze);
+
+  // Le parent peut fournir l'analyse (override) ; sinon on utilise celle du composant.
+  const effectiveAnalysis = aiAnalysis ?? selfAnalysis.analysis;
+  // Lancement/relance de l'analyse. undefined -> pas de bouton (réponse, sans texte,
+  // ou analyse gérée par le parent sans handler de relance).
+  const handleStartAnalysis = aiAnalysis
+    ? onRetryAnalysis
+    : canSelfAnalyze
+      ? selfAnalysis.start
+      : undefined;
   const [liked, setLiked] = useState(!!post.viewer?.like);
   const [likeUri, setLikeUri] = useState(post.viewer?.like || "");
   const [likeCount, setLikeCount] = useState(post.likeCount || 0);
@@ -703,18 +877,9 @@ export default function PostCard({ post, reason, showReplyTo, onReplyPosted }: P
         </div>
       </div>
 
-      {/* Post Trust Score */}
-      <div 
-        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${getTrustScoreBg(postTrustScore)} cursor-help`}
-        title={`${getTrustLabel(postTrustScore)} - Score de confiance du contenu`}
-      >
-        <svg className={`w-4 h-4 ${getTrustScoreColor(postTrustScore)}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-        <span className={`text-xs font-semibold ${getTrustScoreColor(postTrustScore)}`}>
-          {postTrustScore}%
-        </span>
-      </div>
+      {/* Analyse IA : bouton « Analyser » à la demande, puis spinner/résultat.
+          Pour les réponses, pas de onStart -> AiBadge retombe sur le score fallback. */}
+      <AiBadge analysis={effectiveAnalysis} fallbackScore={postTrustScore} onStart={handleStartAnalysis} />
     </div>
     );
   };

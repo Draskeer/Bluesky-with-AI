@@ -125,9 +125,9 @@ export default function Feed() {
       ) : (
         <div>
           {posts.map((feedItem) => (
-            <PostCard 
-              key={`${feedItem.post.uri}-${feedItem.reason?.indexedAt || ''}`} 
-              post={feedItem.post} 
+            <PostCard
+              key={`${feedItem.post.uri}-${feedItem.reason?.indexedAt || ''}`}
+              post={feedItem.post}
               reason={feedItem.reason}
               showReplyTo={feedItem.reply?.parent}
             />

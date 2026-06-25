@@ -21,6 +21,20 @@ interface PaginatedResponse<T> {
   error?: string;
 }
 
+// --- Analyse IA (n8n) ---
+export type Mood = 'positive' | 'neutral' | 'negative';
+
+export type AiAnalysis =
+  | { status: 'pending' }
+  | { status: 'failed' }
+  | { status: 'done'; is_fake: boolean; confidence: number; mood: Mood | null };
+
+export interface AiPostInput {
+  msg_id: string;
+  message: string;
+  user: string;
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -119,6 +133,26 @@ export const api = {
       if (options?.limit) params.set('limit', String(options.limit));
       if (options?.cursor) params.set('cursor', options.cursor);
       return request<{ actors: BlueskyProfile[]; cursor?: string }>(`/profiles/search/actors?${params}`);
+    },
+  },
+
+  analysis: {
+    // Déclenche l'analyse IA (n8n) pour les posts non encore en base ; renvoie l'état courant.
+    request: async (
+      posts: AiPostInput[]
+    ): Promise<ApiResponse<{ results: Record<string, AiAnalysis> }>> => {
+      return request<{ results: Record<string, AiAnalysis> }>('/analysis/request', {
+        method: 'POST',
+        body: JSON.stringify({ posts }),
+      });
+    },
+
+    // Lecture seule (polling) : état d'analyse des IDs fournis.
+    results: async (
+      ids: string[]
+    ): Promise<ApiResponse<{ results: Record<string, AiAnalysis> }>> => {
+      const query = encodeURIComponent(ids.join(','));
+      return request<{ results: Record<string, AiAnalysis> }>(`/analysis/results?ids=${query}`);
     },
   },
 
