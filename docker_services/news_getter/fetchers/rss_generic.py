@@ -183,11 +183,12 @@ def _clean(text: str) -> str:
     return _TAG_RE.sub("", text or "").replace("\xa0", " ").strip()
 
 
-def fetch_rss_sources() -> list[dict]:
-    articles: list[dict] = []
+def fetch_rss_sources_by_source():
+    """Yields one list of articles per RSS source to allow streaming embed+store."""
     seen_ids: set[str] = set()
 
     for source, category, feed_url in RSS_SOURCES:
+        articles: list[dict] = []
         try:
             feed = feedparser.parse(feed_url)
             count = 0
@@ -223,4 +224,5 @@ def fetch_rss_sources() -> list[dict]:
         except Exception as exc:
             logger.error(f"Error fetching RSS '{source}': {exc}")
 
-    return articles
+        if articles:
+            yield articles

@@ -58,10 +58,3 @@ export async function getMessageAnalysis(ids: string[]): Promise<Map<string, Mes
   }
   return result;
 }
-
-export async function closePool(): Promise<void> {
-  if (pool) {
-    await pool.end();
-    pool = null;
-  }
-}

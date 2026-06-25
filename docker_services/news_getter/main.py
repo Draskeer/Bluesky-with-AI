@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from embedder import embed_articles, embed_texts
 from fetchers.bbc import fetch_bbc_news
 from fetchers.newsapi_fetcher import fetch_newsapi
-from fetchers.rss_generic import fetch_rss_sources
+from fetchers.rss_generic import fetch_rss_sources_by_source
 from store import store_articles, wait_for_qdrant
 
 load_dotenv()
@@ -30,35 +30,40 @@ INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES", "150"))
 EMBED_API_PORT = int(os.getenv("EMBED_API_PORT", "8001"))
 
 
+def _embed_and_store(articles: list, label: str) -> int:
+    """Embed + store a batch, then release memory. Returns number of new articles."""
+    if not articles:
+        return 0
+    articles = embed_articles(articles)
+    new_count = store_articles(articles)
+    logger.info(f"{label}: {new_count} new / {len(articles)} total stored")
+    return new_count
+
+
 def fetch_and_store() -> None:
     logger.info("=== Starting news fetch cycle ===")
-    articles = []
+    total_new = 0
 
-    # BBC News via public RSS feeds (runs every cycle — no rate limit)
+    # Each source group is embedded and stored independently to cap peak RAM usage.
+    # BBC (~150 articles)
     bbc_articles = fetch_bbc_news()
-    articles.extend(bbc_articles)
     logger.info(f"BBC: {len(bbc_articles)} articles fetched")
+    total_new += _embed_and_store(bbc_articles, "BBC")
 
-    # Sources de référence diverses FR + EN (RSS publics, sans rate limit)
-    rss_articles = fetch_rss_sources()
-    articles.extend(rss_articles)
-    logger.info(f"RSS multi-sources: {len(rss_articles)} articles fetched")
+    # RSS multi-sources — one source at a time to cap peak RAM usage
+    rss_total = 0
+    for batch in fetch_rss_sources_by_source():
+        rss_total += len(batch)
+        total_new += _embed_and_store(batch, f"RSS({batch[0]['source']})")
+    logger.info(f"RSS multi-sources: {rss_total} articles au total")
 
     # NewsAPI (capped at 8 requests/day to stay safely under the 10 req/day free limit)
     newsapi_articles = fetch_newsapi()
-    articles.extend(newsapi_articles)
     if newsapi_articles:
         logger.info(f"NewsAPI: {len(newsapi_articles)} articles fetched")
+        total_new += _embed_and_store(newsapi_articles, "NewsAPI")
 
-    if not articles:
-        logger.info("No articles fetched this cycle.")
-        return
-
-    articles = embed_articles(articles)
-    new_count = store_articles(articles)
-    skipped = len(articles) - new_count
-    logger.info(f"Stored {new_count} new articles (skipped {skipped} duplicates)")
-    logger.info("=== Cycle complete ===")
+    logger.info(f"=== Cycle complete — {total_new} new articles total ===")
 
 
 def run_scheduler() -> None:
