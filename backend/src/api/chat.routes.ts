@@ -80,8 +80,11 @@ router.get('/convos', async (req: Request, res: Response) => {
         fetchedAt: new Date().toISOString()
       };
 
-      // Envoyer chaque conversation individuellement
-      await sendToN8nWebhook(enrichedConvo);
+      // Envoyer chaque conversation individuellement (fire-and-forget : ne pas
+      // faire échouer la requête si n8n est indisponible)
+      sendToN8nWebhook(enrichedConvo).catch((err) =>
+        logger.warn('n8n webhook (convo) failed:', err?.message || err)
+      );
     }
 
     res.json({
@@ -176,8 +179,10 @@ router.get('/convos/:convoId', async (req: Request, res: Response) => {
         fetchedAt: new Date().toISOString()
       };
 
-      // Envoyer chaque message individuellement
-      await sendToN8nWebhook(enrichedMessage);
+      // Envoyer chaque message individuellement (fire-and-forget)
+      sendToN8nWebhook(enrichedMessage).catch((err) =>
+        logger.warn('n8n webhook (message) failed:', err?.message || err)
+      );
     }
 
     res.json({

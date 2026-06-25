@@ -6,6 +6,8 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { getAnalysisManager } from '../services/analysis-manager.js';
 import { getBlueskyService } from '../services/bluesky.service.js';
+import { getMessageAnalysis } from '../services/db.js';
+import { sendPostToN8n } from '../utils/n8n-webhook.js';
 import { logger } from '../utils/logger.js';
 import type { AnalyzableContent } from '../types/analyzer.js';
 
@@ -25,6 +27,65 @@ const configureAnalyzerSchema = z.object({
   priority: z.number().optional(),
   options: z.record(z.unknown()).optional()
 });
+
+// Schéma d'une demande d'analyse IA (déclenchement n8n)
+const aiRequestSchema = z.object({
+  posts: z.array(z.object({
+    msg_id: z.string().min(1),
+    message: z.string().default(''),
+    user: z.string().default('')
+  })).min(1).max(100)
+});
+
+/**
+ * IDs envoyés à n8n et en attente de résultat, avec l'horodatage du déclenchement.
+ * Si un ID reste en attente plus de INFLIGHT_TTL_MS sans résultat en base, on
+ * considère que l'analyse a échoué (n8n planté/arrêté) : l'ID est purgé pour
+ * pouvoir être relancé (au rechargement de la page ou via le bouton retry).
+ */
+const INFLIGHT_TTL_MS = 120_000; // 2 min : couvre le pire cas (escalade LLM)
+const inFlight = new Map<string, number>(); // msg_id -> startedAt (ms)
+
+function pruneStaleInFlight(): void {
+  const now = Date.now();
+  for (const [id, startedAt] of inFlight) {
+    if (now - startedAt > INFLIGHT_TTL_MS) inFlight.delete(id);
+  }
+}
+
+type AiResult =
+  | { status: 'pending' }
+  | { status: 'failed' }
+  | { status: 'done'; is_fake: boolean; confidence: number; mood: string | null };
+
+/**
+ * Construit la map de résultats pour une liste d'IDs à partir de la base.
+ * Les IDs absents de la base sont marqués 'pending'.
+ */
+async function buildResults(ids: string[]): Promise<Record<string, AiResult>> {
+  pruneStaleInFlight();
+  const known = await getMessageAnalysis(ids);
+  const results: Record<string, AiResult> = {};
+
+  for (const id of ids) {
+    const row = known.get(id);
+    if (row) {
+      inFlight.delete(id); // résultat disponible : plus en attente
+      results[id] = {
+        status: 'done',
+        is_fake: row.is_fake,
+        confidence: row.confidence,
+        mood: row.mood
+      };
+    } else if (inFlight.has(id)) {
+      results[id] = { status: 'pending' }; // déclenché, résultat pas encore en base
+    } else {
+      // Pas en base et pas (ou plus) en vol : jamais déclenché, ou tentative expirée -> échec.
+      results[id] = { status: 'failed' };
+    }
+  }
+  return results;
+}
 
 /**
  * GET /api/analysis/analyzers
@@ -366,6 +427,81 @@ router.post('/stats/reset', (_req: Request, res: Response) => {
     success: true,
     data: { message: 'Stats reset' }
   });
+});
+
+/**
+ * POST /api/analysis/request
+ * Déclenche l'analyse IA (n8n) pour les posts chargés par l'utilisateur.
+ * - Si le post est déjà en base -> renvoie son analyse (status 'done').
+ * - Sinon -> déclenche n8n une seule fois et renvoie status 'pending'.
+ */
+router.post('/request', async (req: Request, res: Response) => {
+  try {
+    const { posts } = aiRequestSchema.parse(req.body);
+    const ids = posts.map(p => p.msg_id);
+
+    const results = await buildResults(ids);
+
+    // Déclencher n8n pour les posts pas encore en base et pas déjà en cours.
+    // 'failed' = jamais déclenché OU tentative précédente expirée -> (re)lancer.
+    // On exclut les messages vides (image seule, repost) : le nœud "Data Verification"
+    // de n8n lève une erreur sur un champ vide -> exécution morte sans INSERT. Inutile
+    // de déclencher : ils restent 'failed'.
+    const toTrigger = posts.filter(
+      p => results[p.msg_id].status === 'failed' &&
+           !inFlight.has(p.msg_id) &&
+           p.message.trim().length > 0
+    );
+
+    await Promise.all(toTrigger.map(async (p) => {
+      inFlight.set(p.msg_id, Date.now());
+      results[p.msg_id] = { status: 'pending' };
+      try {
+        await sendPostToN8n(p);
+      } catch (err: any) {
+        // Échec d'envoi : l'ID redevient relançable immédiatement
+        inFlight.delete(p.msg_id);
+        results[p.msg_id] = { status: 'failed' };
+        logger.error(`Failed to trigger n8n for ${p.msg_id}:`, err?.message || err);
+      }
+    }));
+
+    res.json({ success: true, data: { results } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ success: false, error: 'Invalid request', details: error.errors });
+      return;
+    }
+    logger.error('AI analysis request error:', error);
+    res.status(500).json({ success: false, error: 'Failed to request analysis' });
+  }
+});
+
+/**
+ * GET /api/analysis/results?ids=a,b,c
+ * Lecture seule : renvoie l'état d'analyse des IDs (done + données, ou pending).
+ * Utilisé par le front pour le polling.
+ */
+router.get('/results', async (req: Request, res: Response) => {
+  try {
+    const raw = (req.query.ids as string) || '';
+    const ids = raw.split(',').map(s => s.trim()).filter(Boolean);
+
+    if (ids.length === 0) {
+      res.status(400).json({ success: false, error: 'ids query parameter is required' });
+      return;
+    }
+    if (ids.length > 100) {
+      res.status(400).json({ success: false, error: 'Maximum 100 ids' });
+      return;
+    }
+
+    const results = await buildResults(ids);
+    res.json({ success: true, data: { results } });
+  } catch (error) {
+    logger.error('AI analysis results error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch results' });
+  }
 });
 
 export default router;

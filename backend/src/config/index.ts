@@ -18,9 +18,16 @@ const configSchema = z.object({
   // Bluesky
   BLUESKY_SERVICE_URL: z.string().default('https://bsky.social'),
   
-  // N8N Webhook
-  N8N_WEBHOOK_URL: z.string().optional(),
-  
+  // N8N Webhook (path correspond au nœud Webhook du workflow "Bluesky with AI")
+  N8N_WEBHOOK_URL: z.string().default('http://localhost:5678/webhook/0dde0006-a389-47f5-ae16-caeae58037bc'),
+
+  // Base de données PostgreSQL (db bluesky_ai — table "messages")
+  PGHOST: z.string().default('localhost'),
+  PGPORT: z.coerce.number().default(5432),
+  PGUSER: z.string().default('bluesky'),
+  PGPASSWORD: z.string().default('bluesky_secret'),
+  PGDATABASE: z.string().default('bluesky_ai'),
+
   // Analyse
   ANALYSIS_PARALLEL: z.coerce.boolean().default(true),
   ANALYSIS_MAX_CONCURRENT: z.coerce.number().default(10),

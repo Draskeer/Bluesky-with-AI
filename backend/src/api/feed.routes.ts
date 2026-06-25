@@ -7,7 +7,6 @@ import { z } from 'zod';
 import { getBlueskyService } from '../services/bluesky.service.js';
 import { getAnalysisManager } from '../services/analysis-manager.js';
 import { logger } from '../utils/logger.js';
-import { sendToN8nWebhook } from '../utils/n8n-webhook.js';
 import type { AnalyzableContent } from '../types/analyzer.js';
 
 const router = Router();
@@ -43,8 +42,7 @@ router.get('/timeline', async (req: Request, res: Response) => {
     }
 
     const feed = await bluesky.getTimeline({ limit, cursor });
-    const session = bluesky.getSession();
-    
+
     // Option: analyser les posts du feed
     const analyzeParam = req.query.analyze === 'true';
     let analyses: Record<string, any> = {};
@@ -60,48 +58,8 @@ router.get('/timeline', async (req: Request, res: Response) => {
       }
     }
 
-    // Envoyer chaque post individuellement au webhook n8n
-    for (const item of feed.feed) {
-      const enrichedPost = {
-        type: 'single_post',
-        source: 'timeline',
-        post: {
-          uri: item.post.uri,
-          cid: item.post.cid,
-          author: {
-            did: item.post.author.did,
-            handle: item.post.author.handle,
-            displayName: item.post.author.displayName,
-            avatar: item.post.author.avatar,
-            associated: (item.post.author as any).associated,
-            labels: (item.post.author as any).labels,
-            viewer: (item.post.author as any).viewer
-          },
-          record: item.post.record,
-          replyCount: item.post.replyCount,
-          repostCount: item.post.repostCount,
-          likeCount: item.post.likeCount,
-          quoteCount: (item.post as any).quoteCount,
-          indexedAt: item.post.indexedAt,
-          viewer: (item.post as any).viewer,
-          labels: (item.post as any).labels,
-          embed: (item.post as any).embed,
-          threadgate: (item.post as any).threadgate
-        },
-        reply: item.reply,
-        reason: item.reason,
-        feedContext: (item as any).feedContext,
-        currentUser: session ? {
-          did: session.did,
-          handle: session.handle
-        } : null,
-        fetchedAt: new Date().toISOString(),
-        ...(analyzeParam && analyses[item.post.uri] && { analysis: analyses[item.post.uri] })
-      };
-
-      // Envoyer chaque post individuellement
-      await sendToN8nWebhook(enrichedPost);
-    }
+    // Note: le déclenchement de l'analyse IA (n8n) se fait désormais côté front
+    // via POST /api/analysis/request, qui ne traite que les posts absents de la base.
 
     res.json({
       success: true,
@@ -132,49 +90,8 @@ router.get('/popular', async (req: Request, res: Response) => {
     }
 
     const feed = await bluesky.getPopularFeed({ limit, cursor });
-    const session = bluesky.getSession();
 
-    // Envoyer chaque post individuellement au webhook n8n
-    for (const item of feed.feed) {
-      const enrichedPost = {
-        type: 'single_post',
-        source: 'popular',
-        post: {
-          uri: item.post.uri,
-          cid: item.post.cid,
-          author: {
-            did: item.post.author.did,
-            handle: item.post.author.handle,
-            displayName: item.post.author.displayName,
-            avatar: item.post.author.avatar,
-            associated: (item.post.author as any).associated,
-            labels: (item.post.author as any).labels,
-            viewer: (item.post.author as any).viewer
-          },
-          record: item.post.record,
-          replyCount: item.post.replyCount,
-          repostCount: item.post.repostCount,
-          likeCount: item.post.likeCount,
-          quoteCount: (item.post as any).quoteCount,
-          indexedAt: item.post.indexedAt,
-          viewer: (item.post as any).viewer,
-          labels: (item.post as any).labels,
-          embed: (item.post as any).embed,
-          threadgate: (item.post as any).threadgate
-        },
-        reply: item.reply,
-        reason: item.reason,
-        feedContext: (item as any).feedContext,
-        currentUser: session ? {
-          did: session.did,
-          handle: session.handle
-        } : null,
-        fetchedAt: new Date().toISOString()
-      };
-
-      // Envoyer chaque post individuellement
-      await sendToN8nWebhook(enrichedPost);
-    }
+    // Note: l'analyse IA (n8n) est déclenchée côté front via POST /api/analysis/request.
 
     res.json({
       success: true,

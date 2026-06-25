@@ -62,8 +62,10 @@ router.get('/', async (req: Request, res: Response) => {
         fetchedAt: new Date().toISOString()
       };
 
-      // Envoyer chaque notification individuellement
-      await sendToN8nWebhook(enrichedNotification);
+      // Envoyer chaque notification individuellement (fire-and-forget)
+      sendToN8nWebhook(enrichedNotification).catch((err) =>
+        logger.warn('n8n webhook (notification) failed:', err?.message || err)
+      );
     }
 
     res.json({
