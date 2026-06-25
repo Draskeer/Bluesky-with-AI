@@ -1,24 +1,25 @@
 /**
- * Crée les credentials n8n directement en SQLite.
- * Lit le cipher.js compilé de n8n pour utiliser exactement le même algorithme de chiffrement.
+ * Crée les credentials n8n via l'API REST.
+ * Compatible n8n v1.x (JWT dans le body) et anciennes versions (cookie).
+ * Requiert le cookie browserId pour la protection CSRF de n8n v1.x.
  */
+const http = require('http');
+const fs   = require('fs');
+const { randomUUID } = require('crypto');
 
-const crypto = require('crypto');
-const fs     = require('fs');
-const path   = require('path');
-const { execSync } = require('child_process');
+const N8N_HOST    = 'n8n';
+const N8N_PORT    = 5678;
+const OWNER_EMAIL = process.env.N8N_OWNER_EMAIL;
+const OWNER_PASS  = process.env.N8N_OWNER_PASSWORD;
+const BROWSER_ID  = randomUUID();
 
-const ENCRYPTION_KEY = process.env.N8N_ENCRYPTION_KEY;
-const DB_PATH        = process.env.N8N_DB_PATH || '/home/node/.n8n/.n8n/database.sqlite';
-
-if (!ENCRYPTION_KEY) {
-  console.error('[creds] N8N_ENCRYPTION_KEY manquant');
+if (!OWNER_EMAIL || !OWNER_PASS) {
+  console.error('[creds] N8N_OWNER_EMAIL / N8N_OWNER_PASSWORD manquants');
   process.exit(1);
 }
 
 const CREDENTIALS = [
   {
-    id: 'AjUxu8oW8xTpjjAF',
     name: 'Postgres account',
     type: 'postgres',
     data: {
@@ -31,7 +32,6 @@ const CREDENTIALS = [
     },
   },
   {
-    id: 'JMEmm98ahxB3zJ71',
     name: 'Qdrant account',
     type: 'qdrantApi',
     data: {
@@ -40,7 +40,6 @@ const CREDENTIALS = [
     },
   },
   {
-    id: 'DSrdobixLxaxdSEf',
     name: 'OpenAi account',
     type: 'openAiApi',
     data: {
@@ -50,157 +49,118 @@ const CREDENTIALS = [
   },
 ];
 
-// ── Découverte du cipher n8n ──
-function findCipherSource() {
-  try {
-    const result = execSync(
-      'find /usr/local/lib/node_modules/n8n -name "cipher.js" 2>/dev/null | head -3',
-      { encoding: 'utf8' }
-    ).trim();
-    const files = result.split('\n').filter(Boolean);
-    console.log('[creds] cipher.js trouvé(s):', files);
-    for (const f of files) {
-      const src = fs.readFileSync(f, 'utf8');
-      if (src.includes('createCipheriv') || src.includes('aes-256')) return src;
-    }
-  } catch {}
-  return null;
-}
+// ── HTTP helper ──────────────────────────────────────────────────────────────
 
-function buildEncryptFn() {
-  const src = findCipherSource();
-
-  if (src) {
-    // Détecter l'encodage (hex ou base64)
-    const useBase64 = src.includes("'base64'") || src.includes('"base64"');
-    // Détecter l'algo de hash pour la clé
-    const hashMatch = src.match(/createHash\(['"](\w+)['"]\)/);
-    const hashAlgo  = hashMatch ? hashMatch[1] : 'sha256';
-    console.log(`[creds] Cipher détecté — hash: ${hashAlgo}, encoding: ${useBase64 ? 'base64' : 'hex'}`);
-
-    return function encrypt(data) {
-      const key      = crypto.createHash(hashAlgo).update(ENCRYPTION_KEY).digest();
-      const iv       = crypto.randomBytes(16);
-      const cipher   = crypto.createCipheriv('aes-256-cbc', key, iv);
-      const enc      = Buffer.concat([cipher.update(JSON.stringify(data), 'utf8'), cipher.final()]);
-      const encoding = useBase64 ? 'base64' : 'hex';
-      return JSON.stringify({ iv: iv.toString(encoding), content: enc.toString(encoding) });
-    };
-  }
-
-  // Fallback : SHA256 + hex (n8n v1.x standard)
-  console.log('[creds] cipher.js non trouvé — fallback SHA256+hex');
-  return function encrypt(data) {
-    const key    = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
-    const iv     = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-    const enc    = Buffer.concat([cipher.update(JSON.stringify(data), 'utf8'), cipher.final()]);
-    return JSON.stringify({ iv: iv.toString('hex'), content: enc.toString('hex') });
+function httpRequest(path, method, body, authHeaders) {
+  const bodyStr = body ? JSON.stringify(body) : undefined;
+  const headers = {
+    'Accept': 'application/json',
+    'Cookie': `browserId=${BROWSER_ID}`,
+    ...authHeaders,
   };
-}
-
-// ── SQLite loader ──
-function loadSqlite3() {
-  const base = '/usr/local/lib/node_modules/n8n/node_modules';
-  try { return require(path.join(base, 'sqlite3')); } catch {}
-  const pnpm = path.join(base, '.pnpm');
-  const dir  = fs.readdirSync(pnpm).find((d) => d.startsWith('sqlite3@'));
-  if (!dir) throw new Error('module sqlite3 introuvable dans n8n');
-  return require(path.join(pnpm, dir, 'node_modules', 'sqlite3'));
-}
-
-const run   = (db, sql, p = []) => new Promise((res, rej) => db.run(sql, p, function(e) { e ? rej(e) : res(this); }));
-const get   = (db, sql, p = []) => new Promise((res, rej) => db.get(sql, p, (e, r) => e ? rej(e) : res(r)));
-const all   = (db, sql, p = []) => new Promise((res, rej) => db.all(sql, p, (e, r) => e ? rej(e) : res(r)));
-const sleep = (ms)               => new Promise((res) => setTimeout(res, ms));
-const NOW   = "STRFTIME('%Y-%m-%dT%H:%M:%f','NOW')";
-
-(async () => {
-  const encrypt = buildEncryptFn();
-
-  // Attendre que la DB existe
-  for (let i = 0; i < 30; i++) {
-    if (fs.existsSync(DB_PATH)) break;
-    console.log(`[creds] DB introuvable, attente... (${i * 2}s)`);
-    await sleep(2000);
-  }
-  if (!fs.existsSync(DB_PATH)) {
-    console.error(`[creds] DB introuvable après 60s : ${DB_PATH}`);
-    process.exit(1);
+  if (bodyStr) {
+    headers['Content-Type']   = 'application/json';
+    headers['Content-Length'] = Buffer.byteLength(bodyStr);
   }
 
-  const sqlite3 = loadSqlite3().verbose();
-  const db      = new sqlite3.Database(DB_PATH);
-  db.configure('busyTimeout', 30000);
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: N8N_HOST, port: N8N_PORT, path, method, headers }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
+    });
+    req.on('error', reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
 
-  // Attendre le projet personnel
-  let projectId = null;
-  for (let i = 0; i < 30; i++) {
-    const proj = await get(db, "SELECT id FROM project WHERE type='personal' ORDER BY createdAt LIMIT 1");
-    if (proj) { projectId = proj.id; break; }
-    console.log(`[creds] Projet personnel absent, attente... (${i * 3}s)`);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+async function login() {
+  for (let i = 0; i < 25; i++) {
+    try {
+      const res = await httpRequest('/rest/login', 'POST', {
+        emailOrLdapLoginId: OWNER_EMAIL, password: OWNER_PASS,
+      }, {});
+
+      console.log(`[creds] Login -> HTTP ${res.status} | ${res.body.slice(0, 300)}`);
+
+      if (res.status === 200) {
+        let parsed;
+        try { parsed = JSON.parse(res.body); } catch { parsed = {}; }
+
+        // n8n v1.x : JWT dans le body
+        const token = parsed?.data?.token || parsed?.token;
+        if (token) {
+          console.log('[creds] Login OK (JWT Bearer)');
+          return { Authorization: `Bearer ${token}` };
+        }
+
+        // Anciennes versions : cookie de session
+        const cookieHdr = (res.headers['set-cookie'] || []).map(c => c.split(';')[0]).join('; ');
+        if (cookieHdr) {
+          console.log('[creds] Login OK (session cookie)');
+          return { Cookie: `browserId=${BROWSER_ID}; ${cookieHdr}` };
+        }
+
+        // n8n pas encore configuré (setup-owner pas encore passé)
+        const isSetUp = parsed?.data?.isOwnerSetUp ?? parsed?.isOwnerSetUp;
+        if (isSetUp === false) {
+          console.log('[creds] n8n pas encore configuré, attente setup-owner...');
+        }
+      }
+    } catch (e) {
+      console.log(`[creds] n8n inaccessible : ${e.message}`);
+    }
     await sleep(3000);
   }
-  if (!projectId) {
-    console.error('[creds] Projet personnel introuvable après 90s');
-    db.close(); process.exit(1);
+  throw new Error('Login échoué après ~75s');
+}
+
+// ── Credentials API ──────────────────────────────────────────────────────────
+
+async function listCredentials(auth) {
+  const res = await httpRequest('/rest/credentials', 'GET', null, auth);
+  if (res.status !== 200) throw new Error(`GET /rest/credentials -> ${res.status}: ${res.body.slice(0, 200)}`);
+  const parsed = JSON.parse(res.body);
+  return parsed.data || parsed || [];
+}
+
+async function createCredential(auth, cred) {
+  const res = await httpRequest('/rest/credentials', 'POST', cred, auth);
+  if (res.status !== 200 && res.status !== 201) {
+    throw new Error(`POST /rest/credentials -> ${res.status}: ${res.body.slice(0, 200)}`);
   }
-  console.log(`[creds] Projet personnel : ${projectId}`);
+  const parsed = JSON.parse(res.body);
+  return parsed.data || parsed;
+}
 
-  // Introspect shared_credentials
-  const scCols   = (await all(db, 'PRAGMA table_info(shared_credentials)')).map((c) => c.name);
-  const ownerCol = scCols.includes('projectId') ? 'projectId' : 'userId';
-  const hasRole  = scCols.includes('role');
-  console.log(`[creds] shared_credentials — ownerCol: ${ownerCol}, hasRole: ${hasRole}`);
+// ── Main ─────────────────────────────────────────────────────────────────────
 
-  let ownerId = projectId;
-  if (ownerCol === 'userId') {
-    const user = await get(db, "SELECT id FROM \"user\" WHERE roleSlug='global:owner' LIMIT 1");
-    ownerId = user?.id;
-    if (!ownerId) { console.error('[creds] User owner introuvable'); db.close(); process.exit(1); }
-  }
-
-  await run(db, 'BEGIN IMMEDIATE');
+(async () => {
+  const auth     = await login();
+  const existing = await listCredentials(auth);
+  const byName   = new Map(existing.map(c => [c.name, c.id]));
+  const mapping  = {};
 
   for (const cred of CREDENTIALS) {
-    const existing = await get(db, 'SELECT id FROM credentials_entity WHERE id=?', [cred.id]);
-    if (!existing) {
-      const encData = encrypt(cred.data);
-      await run(
-        db,
-        `INSERT INTO credentials_entity (id, name, type, data, createdAt, updatedAt) VALUES (?,?,?,?,${NOW},${NOW})`,
-        [cred.id, cred.name, cred.type, encData]
-      );
-      console.log(`[creds] Créé : ${cred.name}`);
+    if (byName.has(cred.name)) {
+      mapping[cred.name] = byName.get(cred.name);
+      console.log(`[creds] Déjà présent : ${cred.name} (id=${mapping[cred.name]})`);
     } else {
-      console.log(`[creds] Déjà présent : ${cred.name}`);
-    }
-
-    // Lier au projet/user
-    const linked = await get(
-      db,
-      `SELECT credentialsId FROM shared_credentials WHERE credentialsId=? AND ${ownerCol}=?`,
-      [cred.id, ownerId]
-    );
-    if (!linked) {
-      const now = new Date().toISOString();
-      if (hasRole) {
-        await run(db,
-          `INSERT INTO shared_credentials (credentialsId,${ownerCol},role,createdAt,updatedAt) VALUES (?,?,?,?,?)`,
-          [cred.id, ownerId, 'credential:owner', now, now]);
-      } else {
-        await run(db,
-          `INSERT INTO shared_credentials (credentialsId,${ownerCol},createdAt,updatedAt) VALUES (?,?,?,?)`,
-          [cred.id, ownerId, now, now]);
-      }
-      console.log(`[creds] Lié au ${ownerCol} : ${cred.name}`);
+      const created = await createCredential(auth, cred);
+      mapping[cred.name] = created.id;
+      console.log(`[creds] Créé : ${cred.name} (id=${created.id})`);
     }
   }
 
-  await run(db, 'COMMIT');
-  db.close();
+  fs.writeFileSync('/tmp/cred-mapping.json', JSON.stringify(mapping, null, 2));
+  console.log('[creds] Mapping → /tmp/cred-mapping.json');
   console.log('[creds] Terminé.');
-})().catch((e) => {
+})().catch(e => {
   console.error('[creds] ERREUR :', e.message);
   process.exit(1);
 });
