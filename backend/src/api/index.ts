@@ -12,6 +12,7 @@ import analysisRoutes from './analysis.routes.js';
 import chatRoutes from './chat.routes.js';
 import listsRoutes from './lists.routes.js';
 import savedRoutes from './saved.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.use('/analysis', analysisRoutes);
 router.use('/chat', chatRoutes);
 router.use('/lists', listsRoutes);
 router.use('/saved', savedRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 // Route de santé
 router.get('/health', (_req, res) => {

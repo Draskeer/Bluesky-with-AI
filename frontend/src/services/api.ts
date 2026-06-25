@@ -156,6 +156,31 @@ export const api = {
     },
   },
 
+  dashboard: {
+    get: async (
+      did: string,
+      handle: string,
+      range: 'week' | 'month' | 'year' = 'month'
+    ): Promise<ApiResponse<{
+      trustScore: number;
+      messageCount: number;
+      sentimentSummary: { positive: number; neutral: number; negative: number };
+      fakeRate: number;
+      avgConfidence: number;
+      timeline: Array<{
+        period: string;
+        positive: number;
+        neutral: number;
+        negative: number;
+        fake_count: number;
+        real_count: number;
+        avg_confidence: number;
+      }>;
+    }>> => {
+      return request(`/dashboard/${encodeURIComponent(did)}?range=${range}&handle=${encodeURIComponent(handle)}`);
+    },
+  },
+
   feed: {
     getTimeline: async (
       options?: { limit?: number; cursor?: string }
