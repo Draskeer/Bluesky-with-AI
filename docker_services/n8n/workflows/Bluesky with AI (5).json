@@ -345,23 +345,18 @@
       "parameters": {
         "method": "POST",
         "url": "http://qdrant:6333/collections/news_articles/points/search",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "api-key",
-              "value": "7dd292db4a0648d0a53d6df30b11e66f"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ vector: $json.vector, limit: 12, with_payload: true }) }}",
         "options": {}
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "JMEmm98ahxB3zJ71",
+          "name": "Qdrant account"
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
