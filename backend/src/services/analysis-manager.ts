@@ -123,20 +123,6 @@ export class AnalysisManager extends EventEmitter<AnalysisEvents> {
   }
 
   /**
-   * Désenregistre un analyseur
-   */
-  unregister(analyzerId: string): boolean {
-    const removed = this.analyzers.delete(analyzerId);
-    if (removed) {
-      this.configs.delete(analyzerId);
-      this.stats.analyzerStats.delete(analyzerId);
-      this.emit('analyzer:unregistered', { analyzerId });
-      logger.info(`Unregistered analyzer: ${analyzerId}`);
-    }
-    return removed;
-  }
-
-  /**
    * Configure un analyseur existant
    */
   configure(analyzerId: string, config: Partial<AnalyzerConfig>): void {
@@ -205,27 +191,6 @@ export class AnalysisManager extends EventEmitter<AnalysisEvents> {
     this.emit('analysis:completed', { content, results });
     
     return results;
-  }
-
-  /**
-   * Analyse avec un analyseur spécifique
-   */
-  async analyzeWith(content: AnalyzableContent, analyzerId: string): Promise<AnalysisResult | null> {
-    const analyzer = this.analyzers.get(analyzerId);
-    if (!analyzer) {
-      throw new Error(`Analyzer '${analyzerId}' not found`);
-    }
-
-    const config = this.configs.get(analyzerId);
-    if (!config?.enabled) {
-      throw new Error(`Analyzer '${analyzerId}' is disabled`);
-    }
-
-    if (!analyzer.canAnalyze(content)) {
-      return null;
-    }
-
-    return this.runAnalyzer(content, analyzer);
   }
 
   /**
@@ -395,6 +360,3 @@ export function getAnalysisManager(options?: Partial<AnalysisManagerOptions>): A
   return instance;
 }
 
-export function resetAnalysisManager(): void {
-  instance = null;
-}

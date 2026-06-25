@@ -34,7 +34,7 @@ def _get_client() -> QdrantClient:
         api_key=os.getenv("QDRANT_API_KEY") or None,
         https=False,  # Qdrant runs plain HTTP inside Docker; api_key would otherwise force TLS
         prefer_grpc=False,
-        timeout=30,
+        timeout=120,
     )
 
 
@@ -93,10 +93,14 @@ def _ensure_collection(client: QdrantClient) -> None:
 # ---------------------------------------------------------------------------
 
 
+UPSERT_BATCH_SIZE = 500
+
+
 def store_articles(articles: list[dict]) -> int:
     """
     Store articles that have an embedding.  Returns the number of *new*
     articles inserted (duplicates are silently skipped).
+    Retrieve and upsert are batched to avoid OOM on large article sets.
     """
     articles = [a for a in articles if a.get("embedding")]
     if not articles:
@@ -107,16 +111,18 @@ def store_articles(articles: list[dict]) -> int:
 
     ids = [a["id"] for a in articles]
 
-    # Retrieve existing point IDs in one round-trip
+    # Retrieve existing IDs in batches to avoid oversized requests
     existing_ids: set[str] = set()
     try:
-        results = client.retrieve(
-            collection_name=COLLECTION_NAME,
-            ids=ids,
-            with_payload=False,
-            with_vectors=False,
-        )
-        existing_ids = {str(p.id) for p in results}
+        for i in range(0, len(ids), UPSERT_BATCH_SIZE):
+            batch_ids = ids[i: i + UPSERT_BATCH_SIZE]
+            results = client.retrieve(
+                collection_name=COLLECTION_NAME,
+                ids=batch_ids,
+                with_payload=False,
+                with_vectors=False,
+            )
+            existing_ids.update(str(p.id) for p in results)
     except Exception as exc:
         logger.warning(
             f"Could not pre-check existing points: {exc}. Proceeding with upsert."
@@ -126,21 +132,29 @@ def store_articles(articles: list[dict]) -> int:
     if not new_articles:
         return 0
 
-    points = [
-        PointStruct(
-            id=a["id"],
-            vector=a["embedding"],
-            payload={
-                "url": a["url"],
-                "title": a["title"],
-                "summary": a["summary"],
-                "source": a["source"],
-                "category": a["category"],
-                "published": a["published"],
-            },
-        )
-        for a in new_articles
-    ]
+    inserted = 0
+    for i in range(0, len(new_articles), UPSERT_BATCH_SIZE):
+        batch = new_articles[i: i + UPSERT_BATCH_SIZE]
+        points = [
+            PointStruct(
+                id=a["id"],
+                vector=a["embedding"],
+                payload={
+                    "url": a["url"],
+                    "title": a["title"],
+                    "summary": a["summary"],
+                    "source": a["source"],
+                    "category": a["category"],
+                    "published": a["published"],
+                },
+            )
+            for a in batch
+        ]
+        try:
+            client.upsert(collection_name=COLLECTION_NAME, points=points)
+            inserted += len(points)
+            logger.info(f"Upserted {inserted}/{len(new_articles)} new articles to Qdrant")
+        except Exception as exc:
+            logger.warning(f"Upsert batch {i}–{i+len(batch)} failed: {exc}. Skipping batch.")
 
-    client.upsert(collection_name=COLLECTION_NAME, points=points)
-    return len(points)
+    return inserted

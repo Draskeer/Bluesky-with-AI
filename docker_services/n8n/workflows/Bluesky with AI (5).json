@@ -345,23 +345,18 @@
       "parameters": {
         "method": "POST",
         "url": "http://qdrant:6333/collections/news_articles/points/search",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "api-key",
-              "value": "7dd292db4a0648d0a53d6df30b11e66f"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ vector: $json.vector, limit: 12, with_payload: true }) }}",
         "options": {}
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "JMEmm98ahxB3zJ71",
+          "name": "Qdrant account"
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
@@ -485,7 +480,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst choices = item.choices;\nconst text = choices?.[0]?.message?.content ?? choices?.[0]?.output?.[0] ?? '';\nfunction extract(t){ const m = t.match(/\\{[\\s\\S]*\\}/); if(!m) return null; try { return JSON.parse(m[0]); } catch(e){ return null; } }\nconst p = extract(text);\nif(!p) throw new Error('Reponse IA non-JSON: ' + text.slice(0,200));\nconst inner = (p.is_real_news !== undefined) ? p : (p.object || p.result || p);\nconst is_real = inner.is_real_news === true || inner.is_real_news === 'true';\nlet conf = inner.confidence;\nconf = typeof conf === 'number' ? conf : (parseFloat(conf) || 0);\nreturn [{ json: { is_fake: !is_real, confidence: conf } }];"
+        "jsCode": "const item = $input.first().json;\nconst choices = item.choices;\nconst text = choices?.[0]?.message?.content ?? choices?.[0]?.output?.[0] ?? '';\nfunction extract(t){ const m = t.match(/\\{[\\s\\S]*\\}/); if(!m) return null; try { return JSON.parse(m[0]); } catch(e){ return null; } }\nconst p = extract(text);\nif(!p) throw new Error('Reponse IA non-JSON: ' + text.slice(0,200));\nconst inner = (p.is_real_news !== undefined) ? p : (p.object || p.result || p);\nconst is_real = inner.is_real_news === true || inner.is_real_news === 'true';\nlet conf = inner.confidence;\nconf = typeof conf === 'number' ? conf : (parseFloat(conf) || 0);\nconst mood = $('Sentiment (BERT)').item.json.mood || 'neutral';\nreturn [{ json: { is_fake: !is_real, confidence: conf, verdict: is_real ? 'real' : 'fake', mood } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -499,7 +494,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const v = $input.first().json;\nconst is_fake = v.is_fake === true || v.is_fake === 'true';\nlet conf = v.confidence;\nconf = typeof conf === 'number' ? conf : (parseFloat(conf) || 0);\nreturn [{ json: { is_fake, confidence: conf } }];"
+        "jsCode": "const v = $input.first().json;\nconst mood = $('Sentiment (BERT)').item.json.mood || 'neutral';\nconst is_fake = v.is_fake === true || v.is_fake === 'true';\nlet conf = v.confidence;\nconf = typeof conf === 'number' ? conf : (parseFloat(conf) || 0);\nconst verdict = v.verdict || (is_fake ? 'fake' : 'real');\nreturn [{ json: { is_fake, confidence: conf, verdict, mood } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -513,7 +508,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Sujet non factuel (perso/quotidien) : pas de fact-check, on ne stocke que le mood.\nreturn [{ json: { is_fake: false, confidence: 0 } }];"
+        "jsCode": "const mood = $('Sentiment (BERT)').item.json.mood || 'neutral';\nreturn [{ json: { is_fake: false, confidence: 0, verdict: 'unverified', mood } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -527,7 +522,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO messages(message_id, is_fake, confidence, mood)\nVALUES ('{{ $('Data Verification').item.json.msg_id }}', {{ $json.is_fake }}, {{ $json.confidence }}, '{{ $('Sentiment (BERT)').item.json.mood }}')\nON CONFLICT (message_id) DO UPDATE SET is_fake = EXCLUDED.is_fake, confidence = EXCLUDED.confidence, mood = EXCLUDED.mood",
+        "query": "INSERT INTO messages(message_id, is_fake, confidence, verdict, mood)\nVALUES ('{{ $('Data Verification').item.json.msg_id }}', {{ $json.is_fake }}, {{ $json.confidence }}, '{{ $json.verdict }}', '{{ $json.mood }}')\nON CONFLICT (message_id) DO UPDATE SET is_fake = EXCLUDED.is_fake, confidence = EXCLUDED.confidence, verdict = EXCLUDED.verdict, mood = EXCLUDED.mood",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",

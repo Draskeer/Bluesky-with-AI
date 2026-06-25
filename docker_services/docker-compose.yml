@@ -34,6 +34,11 @@ services:
     environment:
       - PORT=8002
       - TORCH_THREADS=2
+      # Seuils NLI resserrés pour éviter les faux positifs (entailment partiel sur contexte)
+      - ENTAIL_SOFT=0.65   # était 0.50 — un article "soutient" le claim seulement si entailment fort
+      - CORRO_MIN=4        # était 3 — il faut 4 sources concordantes pour conclure "real"
+      - NLI_HI=0.75        # était 0.70 — seuil pour trancher fake/real
+      - ENABLE_LLM_ESCALATION=true
     command: >
       sh -c "
       pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu &&
@@ -62,20 +67,26 @@ services:
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:5678/
       - N8N_USER_FOLDER=/home/node/.n8n
-      # Clé de chiffrement épinglée -> credentials reproductibles entre redémarrages
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      # Configuration simplifiée
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      # Compte owner cree automatiquement au demarrage via init-wrapper.sh
+      - N8N_OWNER_EMAIL=${N8N_OWNER_EMAIL}
+      - N8N_OWNER_PASSWORD=${N8N_OWNER_PASSWORD}
+      - N8N_OWNER_FIRSTNAME=${N8N_OWNER_FIRSTNAME:-Admin}
+      - N8N_OWNER_LASTNAME=${N8N_OWNER_LASTNAME:-User}
     volumes:
       - n8n-data:/home/node/.n8n
       - ./n8n/data_tables:/home/node/.n8n/data_tables
       - ./n8n/workflows:/home/node/workflows:ro
+      - ./n8n/provisioning:/home/node/provisioning:ro
+      - ./n8n/init-wrapper.sh:/home/node/init-wrapper.sh:ro
     networks:
       - llm-network
     depends_on:
       - llm-server
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "/home/node/init-wrapper.sh"]
     healthcheck:
       test:
         [

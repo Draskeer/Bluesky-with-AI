@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS messages (
     message_id VARCHAR(255) UNIQUE NOT NULL,
     is_fake BOOLEAN DEFAULT FALSE,
     confidence FLOAT DEFAULT 0,
+    -- Verdict détaillé : fake | real | unverified
+    verdict VARCHAR(20) DEFAULT 'unverified',
     -- Humeur déterminée par l'IA (enum applicatif : positive | neutral | negative)
     mood VARCHAR(32),
     created_at TIMESTAMPTZ DEFAULT now()
