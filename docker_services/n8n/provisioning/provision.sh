@@ -1,49 +1,14 @@
 #!/bin/sh
 # Provisioning n8n : credentials + data tables + workflows.
-# Execute par n8n-init apres que n8n soit healthy (owner deja cree par init-wrapper.sh).
+# Execute par n8n-init apres que n8n soit healthy.
+# Les scripts SQLite gèrent leur propre attente (busyTimeout + retry projet).
 set -e
 
 echo "=== n8n provisioning ==="
 
-# 1. Credentials (n8n les chiffre a l import avec N8N_ENCRYPTION_KEY, IDs fixes)
-cat > /tmp/credentials.json <<JSON
-[
-  {
-    "id": "AjUxu8oW8xTpjjAF",
-    "name": "Postgres account",
-    "type": "postgres",
-    "data": {
-      "host": "${PG_HOST:-postgres}",
-      "port": ${PG_PORT:-5432},
-      "database": "${PG_DB:-bluesky_ai}",
-      "user": "${PG_USER:-bluesky}",
-      "password": "${PG_PASSWORD:-bluesky_secret}",
-      "ssl": "disable"
-    }
-  },
-  {
-    "id": "JMEmm98ahxB3zJ71",
-    "name": "Qdrant account",
-    "type": "qdrantApi",
-    "data": {
-      "qdrantUrl": "${QDRANT_URL:-http://qdrant:6333}",
-      "apiKey": "${QDRANT_API_KEY}"
-    }
-  },
-  {
-    "id": "DSrdobixLxaxdSEf",
-    "name": "OpenAi account",
-    "type": "openAiApi",
-    "data": {
-      "apiKey": "sk-noauth",
-      "url": "${LLM_BASE_URL:-http://llm-server:8000/v1}"
-    }
-  }
-]
-JSON
-
-echo "--- Import des credentials ---"
-n8n import:credentials --input=/tmp/credentials.json || echo "import credentials: echec"
+# 1. Credentials (SQLite direct + chiffrement AES, IDs fixes)
+echo "--- Creation des credentials ---"
+node /home/node/provisioning/create-credentials.js || echo "create-credentials: echec"
 
 # 2. Data tables de logs
 echo "--- Creation des data tables de logs ---"
