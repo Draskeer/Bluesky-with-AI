@@ -49,6 +49,9 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return [vector.tolist() for vector in model.embed(texts)]
 
 
+EMBED_BATCH_SIZE = int(os.getenv("EMBED_BATCH_SIZE", "200"))
+
+
 def embed_articles(articles: list[dict]) -> list[dict]:
     """Adds an 'embedding' key (list[float]) to each article dict in-place."""
     if not articles:
@@ -56,7 +59,12 @@ def embed_articles(articles: list[dict]) -> list[dict]:
 
     model = _get_model()
     texts = [a.get("content") or a.get("title") or "" for a in articles]
-    embeddings = list(model.embed(texts))
+
+    embeddings: list = []
+    for i in range(0, len(texts), EMBED_BATCH_SIZE):
+        batch = texts[i: i + EMBED_BATCH_SIZE]
+        embeddings.extend(model.embed(batch))
+        logger.info(f"Embedded {min(i + EMBED_BATCH_SIZE, len(texts))}/{len(texts)} articles")
 
     for article, vector in zip(articles, embeddings):
         article["embedding"] = vector.tolist()
