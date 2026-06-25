@@ -33,77 +33,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://llm-server:8000/v1/chat/completions",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "model",
-              "value": "Qwen/Qwen2.5-0.5B"
-            },
-            {
-              "name": "message",
-              "value": "={{ $('Data Verification').item.json.message }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        -112,
-        -400
-      ],
-      "id": "2aa2001d-3f13-4727-971e-febcd05286a0",
-      "name": "IsFakeNews"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://llm-server:8000/v1/chat/completions",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        -112,
-        -192
-      ],
-      "id": "b5fd38a6-917c-4ea1-8d0f-a46bd1eae670",
-      "name": "IsBot"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Récupérer les données d'entrée\nconst items = $input.all();\n\nreturn items.map(item => {\n  try {\n    // Extraire la réponse de l'IA\n    const choices = item.json.choices;\n    \n    if (!choices || !choices[0] || !choices[0].output || !choices[0].output[0]) {\n      throw new Error(\"Structure de réponse invalide : impossible de trouver choices[0].output[0]\");\n    }\n    \n    // Parser le JSON de la réponse\n    const responseText = choices[0].output[0];\n    const parsedResponse = JSON.parse(responseText);\n    \n    // Vérifier les champs requis\n    const champsManquants = [];\n    \n    if (parsedResponse.is_real_news === undefined) {\n      champsManquants.push('is_real_news');\n    }\n    \n    if (parsedResponse.confidence === undefined) {\n      champsManquants.push('confidence');\n    }\n    \n    // Si des champs manquent, lever une erreur\n    if (champsManquants.length > 0) {\n      throw new Error(`Il manque ${champsManquants.length} champ(s) : ${champsManquants.join(', ')}`);\n    }\n    \n    // Retourner les données validées\n    return {\n      json: {\n        is_real_news: parsedResponse.is_real_news,\n        confidence: parsedResponse.confidence\n      }\n    };\n    \n  } catch (error) {\n    throw new Error(`Erreur de validation : ${error.message}`);\n  }\n});"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        64,
-        -400
-      ],
-      "id": "d24c8dff-59cc-47f6-b871-310ba08086be",
-      "name": "Output Verification",
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        64,
-        -192
-      ],
-      "id": "72245d51-dcfd-4a1a-9ba3-81296b6da7ab",
-      "name": "Output Verification1",
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
         "dataTableId": {
           "__rl": true,
           "value": "rqrEG335i7KYQrnO",
@@ -218,25 +147,11 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1,
       "position": [
-        288,
-        -48
+        600,
+        200
       ],
       "id": "cb99670f-8c53-4a81-9f72-ef07dcc1aa99",
       "name": "Errors Logger"
-    },
-    {
-      "parameters": {
-        "url": "http://llm-server:8000/v1/chat/completions",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        256,
-        -192
-      ],
-      "id": "0a014122-f0eb-4ab0-a36c-5cee0c717bf4",
-      "name": "Write In DB"
     },
     {
       "parameters": {
@@ -301,99 +216,73 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1,
       "position": [
-        272,
-        -416
+        2480,
+        -208
       ],
       "id": "1c22c105-aabc-4cc5-bd43-e4b90f959501",
       "name": "Infos Logger1"
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO messages(message_id, is_fake, confidence)\nVALUES ({{ $('Data Verification').item.json.msg_id }}, {{ $('Output Verification').item.json.is_real_news }}, {{ $('Output Verification').item.json.confidence }})",
+        "method": "POST",
+        "url": "http://classifier:8002/topic",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $('Data Verification').item.json.message }}"
+            }
+          ]
+        },
         "options": {}
       },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        496,
-        -416
+        -160,
+        -208
       ],
-      "id": "86b8ba1b-7c5b-477c-a624-5e668fae6cb7",
-      "name": "Execute a SQL query",
-      "credentials": {
-        "postgres": {
-          "id": "AjUxu8oW8xTpjjAF",
-          "name": "Postgres account"
-        }
-      }
+      "id": "b1000001-0000-0000-0000-000000000001",
+      "name": "Topic (BERT)"
     },
     {
       "parameters": {
-        "operation": "listCollections",
-        "requestOptions": {}
+        "jsCode": "const item = $input.first().json;\nconst checkable = item.checkable === true || item.checkable === 'true';\nreturn [{ json: { checkable, topic: item.topic ?? null, topic_confidence: item.confidence ?? 0 } }];"
       },
-      "type": "n8n-nodes-qdrant.qdrant",
-      "typeVersion": 1,
-      "position": [
-        -384,
-        -544
-      ],
-      "id": "abdf9278-3e2d-46ce-8e59-00eefefb9d42",
-      "name": "List Collections",
-      "credentials": {
-        "qdrantRestApi": {
-          "id": "1ikVNiyOOWiZlYao",
-          "name": "Qdrant account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {}
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [
-        -1088,
-        -992
-      ],
-      "id": "3cf34649-7fca-4c4c-a873-78b48e103793",
-      "name": "Schedule Trigger"
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {}
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [
-        -640,
-        -544
-      ],
-      "id": "ccb1e5d5-0a03-47ed-bc82-2308ffa53cf9",
-      "name": "Schedule Trigger1"
-    },
-    {
-      "parameters": {
-        "jsCode": "const item = $input.item.json;\nconsole.log(`Article rejeté (texte trop court ou vide): ${item.title || 'sans titre'}`);\nreturn [];"
-      },
-      "id": "f04c896d-ab53-4e24-b8d2-175fc450cb2c",
-      "name": "🗑️ Articles rejetés",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        576,
-        -928
-      ]
+        40,
+        -208
+      ],
+      "id": "b1000002-0000-0000-0000-000000000002",
+      "name": "Parse Topic",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://classifier:8002/sentiment",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $('Data Verification').item.json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        240,
+        -208
+      ],
+      "id": "b1000003-0000-0000-0000-000000000003",
+      "name": "Sentiment (BERT)"
     },
     {
       "parameters": {
@@ -401,25 +290,17 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
-              "id": "has-text",
-              "leftValue": "={{ $json.text }}",
-              "rightValue": "",
+              "id": "topic-checkable",
+              "leftValue": "={{ $('Parse Topic').item.json.checkable }}",
+              "rightValue": true,
               "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            },
-            {
-              "id": "min-length",
-              "leftValue": "={{ $json.text.length }}",
-              "rightValue": 30,
-              "operator": {
-                "type": "number",
-                "operation": "gte"
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
               }
             }
           ],
@@ -427,182 +308,242 @@
         },
         "options": {}
       },
-      "id": "8c6fb437-32fe-4bba-9331-4c6685276209",
-      "name": "✅ Filtre qualité",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        352,
-        -1008
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Parse le XML RSS et extrait les articles\nconst xml = $input.item.json.data || '';\nconst category = $input.item.json.category || 'general';\nconst source = $input.item.json.source || 'unknown';\n\nif (!xml || typeof xml !== 'string') {\n  return [];\n}\n\n// Extraction des items RSS avec regex\nconst items = [];\nconst itemRegex = /<item[^>]*>([\\s\\S]*?)<\\/item>/gi;\nlet match;\n\nwhile ((match = itemRegex.exec(xml)) !== null) {\n  const item = match[1];\n\n  const getTag = (tag) => {\n    const r = new RegExp(`<${tag}[^>]*><!\\\\[CDATA\\\\[([\\\\s\\\\S]*?)\\\\]\\\\]><\\/${tag}>|<${tag}[^>]*>([\\\\s\\\\S]*?)<\\/${tag}>`, 'i');\n    const m = item.match(r);\n    return m ? (m[1] || m[2] || '').trim() : '';\n  };\n\n  const title = getTag('title');\n  const description = getTag('description');\n  const link = getTag('link') || getTag('guid');\n  const pubDate = getTag('pubDate') || getTag('published') || new Date().toISOString();\n  const author = getTag('author') || getTag('dc:creator') || source;\n\n  if (!title) continue;\n\n  // Nettoyage HTML basique\n  const cleanText = (str) => str\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  const cleanTitle = cleanText(title);\n  const cleanDesc = cleanText(description);\n\n  // Texte complet pour l'embedding\n  const fullText = `${cleanTitle}. ${cleanDesc}`;\n\n  // ID unique basé sur l'URL\n  const id = Buffer.from(link || cleanTitle).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);\n\n  items.push({\n    json: {\n      id,\n      title: cleanTitle,\n      description: cleanDesc,\n      text: fullText,\n      url: link,\n      source,\n      category,\n      published_at: new Date(pubDate).toISOString(),\n      fetched_at: new Date().toISOString()\n    }\n  });\n}\n\nreturn items.slice(0, 20); // Max 20 articles par source"
-      },
-      "id": "7fe5743a-b300-43d9-a447-1e9fda50491c",
-      "name": "🔍 Parse RSS",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        128,
-        -1008
-      ]
-    },
-    {
-      "parameters": {
-        "url": "={{ $json.url }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "text"
-            }
-          }
-        }
-      },
-      "id": "d59329d9-b7e4-4719-8827-4a7a883a91e3",
-      "name": "🌐 Fetch RSS",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        -96,
-        -1008
+        440,
+        -208
       ],
-      "continueOnFail": true
+      "id": "b1000004-0000-0000-0000-000000000004",
+      "name": "Is Checkable?"
     },
     {
       "parameters": {
-        "jsCode": "// Liste des flux RSS par catégorie\nconst feeds = [\n  // POLITIQUE\n  { url: 'https://feeds.bbci.co.uk/news/politics/rss.xml', category: 'politique', source: 'BBC' },\n  { url: 'https://feeds.reuters.com/reuters/politicsNews', category: 'politique', source: 'Reuters' },\n  { url: 'https://www.lemonde.fr/politique/rss_full.xml', category: 'politique', source: 'Le Monde' },\n  // FINANCE\n  { url: 'https://feeds.reuters.com/reuters/businessNews', category: 'finance', source: 'Reuters' },\n  { url: 'https://feeds.marketwatch.com/marketwatch/topstories/', category: 'finance', source: 'MarketWatch' },\n  { url: 'https://www.lesechos.fr/rss/rss_finance.xml', category: 'finance', source: 'Les Echos' },\n  // TECH\n  { url: 'https://techcrunch.com/feed/', category: 'tech', source: 'TechCrunch' },\n  { url: 'https://www.theverge.com/rss/index.xml', category: 'tech', source: 'The Verge' },\n  { url: 'https://feeds.arstechnica.com/arstechnica/index', category: 'tech', source: 'Ars Technica' }\n];\n\nreturn feeds.map(feed => ({ json: feed }));"
-      },
-      "id": "3386c7cd-9106-4923-af54-d16ed5f4769f",
-      "name": "📋 Sources RSS",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -304,
-        -1008
-      ]
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
+        "method": "POST",
+        "url": "http://news_getter:8001/embed",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
             {
-              "field": "hours"
+              "name": "text",
+              "value": "={{ $('Data Verification').item.json.message }}"
             }
           ]
-        }
-      },
-      "id": "ece1f116-c7cd-4b6d-b254-47142aa3903d",
-      "name": "⏰ Schedule (toutes les heures)",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        -528,
-        -1008
-      ]
-    },
-    {
-      "parameters": {
-        "mode": "insert",
-        "qdrantCollection": {
-          "__rl": true,
-          "value": "news",
-          "mode": "list",
-          "cachedResultName": "news"
         },
-        "embeddingBatchSize": 1,
         "options": {}
       },
-      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
-      "typeVersion": 1.3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        784,
-        -1024
+        660,
+        -352
       ],
-      "id": "2ee035d4-4d91-419f-8b08-b3d25d517c78",
-      "name": "Qdrant Vector Store",
-      "credentials": {
-        "qdrantApi": {
-          "id": "JMEmm98ahxB3zJ71",
-          "name": "QdrantApi account"
-        }
-      }
+      "id": "a1000004-0000-0000-0000-000000000004",
+      "name": "Embed Message"
     },
     {
       "parameters": {
-        "model": "=multilingual-e5-small",
+        "method": "POST",
+        "url": "http://qdrant:6333/collections/news_articles/points/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key",
+              "value": "7dd292db4a0648d0a53d6df30b11e66f"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ vector: $json.vector, limit: 12, with_payload: true }) }}",
         "options": {}
       },
-      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
-      "typeVersion": 1.2,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        784,
-        -832
+        860,
+        -352
       ],
-      "id": "d648b9a8-7c7b-4bf5-bea3-7768eed238a4",
-      "name": "Embeddings OpenAI",
-      "credentials": {
-        "openAiApi": {
-          "id": "DSrdobixLxaxdSEf",
-          "name": "OpenAi account"
-        }
-      }
+      "id": "a1000005-0000-0000-0000-000000000005",
+      "name": "Qdrant Search"
     },
     {
       "parameters": {
-        "dataType": "jsonData",
-        "textSplittingMode": "custom",
-        "options": {
-          "metadata": {
-            "metadataValues": [
-              {
-                "name": "source",
-                "value": "={{ $json.source }}"
-              },
-              {
-                "name": "category",
-                "value": "={{ $json.category }}"
-              },
-              {
-                "name": "url",
-                "value": "={{ $json.url }}"
-              },
-              {
-                "name": "title",
-                "value": "={{ $json.title }}"
-              },
-              {
-                "name": "published_at",
-                "value": "={{ $json.published_at }}"
+        "jsCode": "const msg = $('Data Verification').item.json.message;\nconst hits = $input.first().json.result || [];\nconst articles = hits.map(h => ({\n  title: (h.payload && h.payload.title) || '',\n  summary: (h.payload && h.payload.summary) || '',\n  score: typeof h.score === 'number' ? h.score : 0\n}));\nreturn [{ json: { message: msg, articles } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        -352
+      ],
+      "id": "b1000005-0000-0000-0000-000000000005",
+      "name": "Build Articles",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://classifier:8002/verify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $json.message, articles: $json.articles }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1260,
+        -352
+      ],
+      "id": "b1000006-0000-0000-0000-000000000006",
+      "name": "Verify (NLI)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "needs-llm",
+              "leftValue": "={{ $json.needs_llm }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
               }
-            ]
-          }
-        }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
       "position": [
-        896,
-        -832
+        1460,
+        -352
       ],
-      "id": "2c322019-435a-4b41-a4f6-16bc68733798",
-      "name": "Default Data Loader"
+      "id": "b1000007-0000-0000-0000-000000000007",
+      "name": "Needs LLM?"
     },
     {
       "parameters": {
-        "chunkSize": 400,
-        "chunkOverlap": 50,
+        "jsCode": "const msg = $('Data Verification').item.json.message;\nconst articles = $('Build Articles').item.json.articles || [];\nconst context = articles.map((a, i) => {\n  const score = (typeof a.score === 'number') ? a.score.toFixed(3) : '?';\n  return `${i + 1}. [similarite ${score}] ${a.title || ''} - ${a.summary || ''}`;\n}).join('\\n');\nconst prompt_input = `Voici des articles de vraies actualites similaires (base de reference) :\\n${context || '(aucun article similaire trouve)'}\\n\\nMessage a analyser : \"${msg}\"`;\nreturn [{ json: { prompt_input } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        -448
+      ],
+      "id": "b1000008-0000-0000-0000-000000000008",
+      "name": "Build LLM Prompt",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://llm-server:8000/v1/chat/completions",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "Qwen/Qwen2.5-0.5B-Instruct"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.prompt_input }}"
+            },
+            {
+              "name": "task",
+              "value": "fake_news"
+            }
+          ]
+        },
         "options": {}
       },
-      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        896,
-        -656
+        1860,
+        -448
       ],
-      "id": "1ed31742-fd4d-4067-9e9e-deb0aaf3b108",
-      "name": "Recursive Character Text Splitter"
+      "id": "a1000007-0000-0000-0000-000000000007",
+      "name": "FakeNews (Qwen)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst choices = item.choices;\nconst text = choices?.[0]?.message?.content ?? choices?.[0]?.output?.[0] ?? '';\nfunction extract(t){ const m = t.match(/\\{[\\s\\S]*\\}/); if(!m) return null; try { return JSON.parse(m[0]); } catch(e){ return null; } }\nconst p = extract(text);\nif(!p) throw new Error('Reponse IA non-JSON: ' + text.slice(0,200));\nconst inner = (p.is_real_news !== undefined) ? p : (p.object || p.result || p);\nconst is_real = inner.is_real_news === true || inner.is_real_news === 'true';\nlet conf = inner.confidence;\nconf = typeof conf === 'number' ? conf : (parseFloat(conf) || 0);\nreturn [{ json: { is_fake: !is_real, confidence: conf } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        -448
+      ],
+      "id": "a1000008-0000-0000-0000-000000000008",
+      "name": "Parse FakeNews",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $input.first().json;\nconst is_fake = v.is_fake === true || v.is_fake === 'true';\nlet conf = v.confidence;\nconf = typeof conf === 'number' ? conf : (parseFloat(conf) || 0);\nreturn [{ json: { is_fake, confidence: conf } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        -256
+      ],
+      "id": "b1000009-0000-0000-0000-000000000009",
+      "name": "Verify Result",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sujet non factuel (perso/quotidien) : pas de fact-check, on ne stocke que le mood.\nreturn [{ json: { is_fake: false, confidence: 0 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -64
+      ],
+      "id": "b1000010-0000-0000-0000-000000000010",
+      "name": "Personal Result"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO messages(message_id, is_fake, confidence, mood)\nVALUES ('{{ $('Data Verification').item.json.msg_id }}', {{ $json.is_fake }}, {{ $json.confidence }}, '{{ $('Sentiment (BERT)').item.json.mood }}')\nON CONFLICT (message_id) DO UPDATE SET is_fake = EXCLUDED.is_fake, confidence = EXCLUDED.confidence, mood = EXCLUDED.mood",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2280,
+        -208
+      ],
+      "id": "a1000011-0000-0000-0000-000000000011",
+      "name": "Insert Message",
+      "credentials": {
+        "postgres": {
+          "id": "AjUxu8oW8xTpjjAF",
+          "name": "Postgres account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -636,33 +577,33 @@
         ]
       ]
     },
-    "IsBot": {
+    "Infos Logger": {
       "main": [
         [
           {
-            "node": "Output Verification1",
+            "node": "Topic (BERT)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IsFakeNews": {
+    "Topic (BERT)": {
       "main": [
         [
           {
-            "node": "Output Verification",
+            "node": "Parse Topic",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Output Verification1": {
+    "Parse Topic": {
       "main": [
         [
           {
-            "node": "Write In DB",
+            "node": "Sentiment (BERT)",
             "type": "main",
             "index": 0
           }
@@ -676,7 +617,174 @@
         ]
       ]
     },
-    "Output Verification": {
+    "Sentiment (BERT)": {
+      "main": [
+        [
+          {
+            "node": "Is Checkable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Checkable?": {
+      "main": [
+        [
+          {
+            "node": "Embed Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Personal Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Message": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Search": {
+      "main": [
+        [
+          {
+            "node": "Build Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Articles": {
+      "main": [
+        [
+          {
+            "node": "Verify (NLI)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Errors Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify (NLI)": {
+      "main": [
+        [
+          {
+            "node": "Needs LLM?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs LLM?": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Verify Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Prompt": {
+      "main": [
+        [
+          {
+            "node": "FakeNews (Qwen)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Errors Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FakeNews (Qwen)": {
+      "main": [
+        [
+          {
+            "node": "Parse FakeNews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse FakeNews": {
+      "main": [
+        [
+          {
+            "node": "Insert Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Errors Logger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Result": {
+      "main": [
+        [
+          {
+            "node": "Insert Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Personal Result": {
+      "main": [
+        [
+          {
+            "node": "Insert Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Message": {
       "main": [
         [
           {
@@ -684,149 +792,10 @@
             "type": "main",
             "index": 0
           }
-        ],
-        [
-          {
-            "node": "Errors Logger",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Write In DB": {
-      "main": [
-        []
-      ]
-    },
-    "Infos Logger": {
-      "main": [
-        [
-          {
-            "node": "IsFakeNews",
-            "type": "main",
-            "index": 0
-          }
         ]
       ]
     },
     "Infos Logger1": {
-      "main": [
-        [
-          {
-            "node": "Execute a SQL query",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "List Collections": {
-      "main": [
-        []
-      ]
-    },
-    "Schedule Trigger": {
-      "main": [
-        []
-      ]
-    },
-    "✅ Filtre qualité": {
-      "main": [
-        [
-          {
-            "node": "Qdrant Vector Store",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "🗑️ Articles rejetés",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "🔍 Parse RSS": {
-      "main": [
-        [
-          {
-            "node": "✅ Filtre qualité",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "🌐 Fetch RSS": {
-      "main": [
-        [
-          {
-            "node": "🔍 Parse RSS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "📋 Sources RSS": {
-      "main": [
-        [
-          {
-            "node": "🌐 Fetch RSS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "⏰ Schedule (toutes les heures)": {
-      "main": [
-        [
-          {
-            "node": "📋 Sources RSS",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Embeddings OpenAI": {
-      "ai_embedding": [
-        [
-          {
-            "node": "Qdrant Vector Store",
-            "type": "ai_embedding",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Default Data Loader": {
-      "ai_document": [
-        [
-          {
-            "node": "Qdrant Vector Store",
-            "type": "ai_document",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Recursive Character Text Splitter": {
-      "ai_textSplitter": [
-        [
-          {
-            "node": "Default Data Loader",
-            "type": "ai_textSplitter",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Qdrant Vector Store": {
       "main": [
         []
       ]
@@ -836,11 +805,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "cdf3e402-4602-476e-a39c-e925522731de",
   "meta": {
     "instanceId": "718b59af9bccfcbbc7faadae36b03f3caad98b4e7f805a18fb39e37b467d7324",
     "templateCredsSetupCompleted": true
   },
   "id": "mIrGZNk4zk0WCqbH",
-  "tags": []
+  "tags": [],
+  "versionId": "ead1f64b-68f6-4206-9f18-a351d0e3a194"
 }

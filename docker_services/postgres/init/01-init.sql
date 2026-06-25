@@ -1,8 +1,12 @@
 CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
-    message_id INT UNIQUE NOT NULL,
+    -- ID Bluesky du post (URI at://...), donc une chaîne et non un entier
+    message_id VARCHAR(255) UNIQUE NOT NULL,
     is_fake BOOLEAN DEFAULT FALSE,
-    confidence FLOAT DEFAULT 0
+    confidence FLOAT DEFAULT 0,
+    -- Humeur déterminée par l'IA (enum applicatif : positive | neutral | negative)
+    mood VARCHAR(32),
+    created_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS users (

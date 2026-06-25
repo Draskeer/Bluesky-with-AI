@@ -11,14 +11,44 @@ services:
     working_dir: /app
     command: >
       bash -c "
-      apt-get update && 
+      apt-get update &&
       apt-get install -y python3 python3-pip &&
-      pip3 install --break-system-packages fastapi uvicorn transformers torch sentence-transformers &&
+      pip3 install --break-system-packages torch --index-url https://download.pytorch.org/whl/cpu &&
+      pip3 install --break-system-packages fastapi uvicorn transformers numpy &&
       python3 qwen/vllm.py
       "
     networks:
       - llm-network
     restart: unless-stopped
+
+  # Classifier BERT (sentiment + fact-check NLI + topic zero-shot, CPU, inférence seule)
+  classifier:
+    image: python:3.11-slim
+    container_name: classifier
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./classifier:/app
+      - llm-models:/root/.cache/huggingface
+    working_dir: /app
+    environment:
+      - PORT=8002
+      - TORCH_THREADS=2
+    command: >
+      sh -c "
+      pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu &&
+      pip install --no-cache-dir -r requirements.txt &&
+      python server.py
+      "
+    networks:
+      - llm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8002/health').status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 180s
 
   # n8n
   n8n:
@@ -32,6 +62,8 @@ services:
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:5678/
       - N8N_USER_FOLDER=/home/node/.n8n
+      # Clé de chiffrement épinglée -> credentials reproductibles entre redémarrages
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
       # Configuration simplifiée
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_VERSION_NOTIFICATIONS_ENABLED=false
@@ -59,12 +91,24 @@ services:
   n8n-init:
     image: n8nio/n8n
     container_name: n8n-init
+    env_file:
+      - .env
     volumes:
       - n8n-data:/home/node/.n8n
       - ./n8n/workflows:/home/node/workflows:ro
-      - ./n8n/entities:/home/node/entities:ro
+      - ./n8n/provisioning:/home/node/provisioning:ro
     environment:
       - N8N_USER_FOLDER=/home/node/.n8n
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Credentials provisionnées automatiquement
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_DB=bluesky_ai
+      - PG_USER=bluesky
+      - PG_PASSWORD=bluesky_secret
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - LLM_BASE_URL=http://llm-server:8000/v1
     networks:
       - llm-network
     depends_on:
@@ -72,30 +116,7 @@ services:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - |
-        echo "=== Initialisation n8n ==="
-
-        # Import des entities (data tables, etc.) si le dossier existe et contient des fichiers
-        if [ -d "/home/node/entities" ] && [ "$$(ls -A /home/node/entities 2>/dev/null)" ]; then
-          echo "Import des entities (data tables, etc.)..."
-          n8n import:entities --inputDir=/home/node/entities || echo "Entities peut-être déjà importées"
-        fi
-
-        # Import des workflows
-        echo "Import des workflows..."
-        for workflow in /home/node/workflows/*.json; do
-          if [ -f "$$workflow" ]; then
-            filename=$$(basename "$$workflow")
-            echo "Import du workflow: $$filename"
-            n8n import:workflow --input="$$workflow" || echo "Workflow peut-être déjà existant"
-          fi
-        done
-
-        echo "=== Initialisation terminée ==="
-        echo ""
-        echo "NOTE: Pour importer des data tables, exportez-les d'abord depuis une instance n8n:"
-        echo "  docker exec n8n n8n export:entities --outputDir=/tmp/export"
-        echo "  Puis copiez le contenu dans ./n8n/entities/"
+      - "sh /home/node/provisioning/provision.sh"
     restart: "no"
 
   # Base de données PostgreSQL pour n8n
@@ -189,7 +210,10 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: "6333"
       QDRANT_API_KEY: ${QDRANT_API_KEY}
+      EMBED_API_PORT: "8001"
       # INTERVAL_MINUTES: "150"  # 2.5h by default, override if needed
+    ports:
+      - "8001:8001"
     volumes:
       - news_data:/data
     depends_on:
