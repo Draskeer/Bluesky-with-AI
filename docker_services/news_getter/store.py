@@ -34,7 +34,7 @@ def _get_client() -> QdrantClient:
         api_key=os.getenv("QDRANT_API_KEY") or None,
         https=False,  # Qdrant runs plain HTTP inside Docker; api_key would otherwise force TLS
         prefer_grpc=False,
-        timeout=30,
+        timeout=120,
     )
 
 
@@ -150,8 +150,11 @@ def store_articles(articles: list[dict]) -> int:
             )
             for a in batch
         ]
-        client.upsert(collection_name=COLLECTION_NAME, points=points)
-        inserted += len(points)
-        logger.info(f"Upserted {inserted}/{len(new_articles)} new articles to Qdrant")
+        try:
+            client.upsert(collection_name=COLLECTION_NAME, points=points)
+            inserted += len(points)
+            logger.info(f"Upserted {inserted}/{len(new_articles)} new articles to Qdrant")
+        except Exception as exc:
+            logger.warning(f"Upsert batch {i}–{i+len(batch)} failed: {exc}. Skipping batch.")
 
     return inserted
