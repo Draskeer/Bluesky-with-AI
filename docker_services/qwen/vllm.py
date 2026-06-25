@@ -22,11 +22,14 @@ import torch.nn.functional as F
 app = FastAPI()
 
 # ─────────────────────────────────────────────
-# 1. Chargement modèle CHAT (Qwen2.5-0.5B)
+# 1. Chargement modèle CHAT (Qwen2.5-0.5B-Instruct)
 # ─────────────────────────────────────────────
-print("📦 Chargement du modèle Chat : Qwen2.5-0.5B...")
-chat_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B")
-chat_tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
+# /!\ Version *Instruct* (instruction-tuned) : la version "base" ne suit pas
+# les consignes de format JSON. Indispensable pour des sorties exploitables.
+CHAT_MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
+print(f"📦 Chargement du modèle Chat : {CHAT_MODEL_NAME}...")
+chat_model = AutoModelForCausalLM.from_pretrained(CHAT_MODEL_NAME)
+chat_tokenizer = AutoTokenizer.from_pretrained(CHAT_MODEL_NAME)
 print("✓ Modèle Chat chargé !")
 
 # ─────────────────────────────────────────────
@@ -52,6 +55,8 @@ class ChatRequest(BaseModel):
     model: Optional[str] = "Qwen/Qwen2.5-0.5B"
     messages: Optional[List[dict]] = None
     message: Optional[str] = None
+    # Tâche demandée : "fake_news" (défaut) | "scope" | "mood"
+    task: Optional[str] = "fake_news"
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 512
 
@@ -122,12 +127,51 @@ CRITÈRES D'ÉVALUATION :
 5. Formulation : Présence de termes sensationnalistes, d'erreurs factuelles évidentes ?
 6. Contexte : L'information est-elle sortie de son contexte ou déformée ?
 
+ANALYSE DE L'HUMEUR (mood) :
+Déterminez également la tonalité générale du message parmi EXACTEMENT ces valeurs :
+- "positive" : ton optimiste, bienveillant, enthousiaste
+- "neutral"  : ton factuel, informatif, sans charge émotionnelle
+- "negative" : ton hostile, alarmiste, colérique ou pessimiste
+
 FORMAT DE RÉPONSE :
 Répondez SEULEMENT avec un objet JSON valide :
 {
   "is_real_news": boolean,
-  "confidence": float
+  "confidence": float,
+  "mood": "positive" | "neutral" | "negative"
 }"""
+
+
+# Classification : message personnel vs global (information publique/vérifiable)
+SCOPE_SYSTEM_PROMPT = """Vous êtes un classificateur de messages. Déterminez si un message relève d'une information GLOBALE ou d'un message PERSONNEL.
+
+- "global"   : actualité, fait public, affirmation vérifiable sur le monde, la politique, la science, l'économie, la santé, la société, etc. (susceptible d'être une vraie ou fausse information).
+- "personal" : vie privée, ressenti intime, opinion personnelle, conversation quotidienne, sans portée factuelle publique vérifiable.
+
+Répondez SEULEMENT avec un objet JSON valide :
+{
+  "scope": "global" | "personal"
+}"""
+
+
+# Analyse de sentiment uniquement
+MOOD_SYSTEM_PROMPT = """Vous êtes un expert en analyse de sentiment. Déterminez la tonalité générale du message parmi EXACTEMENT ces valeurs :
+- "positive" : ton optimiste, bienveillant, enthousiaste
+- "neutral"  : ton factuel, informatif, sans charge émotionnelle
+- "negative" : ton hostile, alarmiste, colérique ou pessimiste
+
+Répondez SEULEMENT avec un objet JSON valide :
+{
+  "mood": "positive" | "neutral" | "negative"
+}"""
+
+
+# Sélection du prompt système selon la tâche demandée par le client
+SYSTEM_PROMPTS = {
+    "fake_news": SYSTEM_PROMPT,
+    "scope": SCOPE_SYSTEM_PROMPT,
+    "mood": MOOD_SYSTEM_PROMPT,
+}
 
 
 # ─────────────────────────────────────────────
@@ -186,16 +230,27 @@ async def _handle_chat(request: ChatRequest):
     else:
         raise HTTPException(status_code=400, detail="'messages' ou 'message' requis")
 
-    prompt = f"System: {SYSTEM_PROMPT}\nUser: {user_msg}\nAssistant:"
+    system_prompt = SYSTEM_PROMPTS.get(request.task or "fake_news", SYSTEM_PROMPT)
+
+    # Chat template officiel Qwen (rôles system/user) → bien meilleure adhérence au format
+    chat_messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_msg},
+    ]
+    prompt = chat_tokenizer.apply_chat_template(
+        chat_messages, tokenize=False, add_generation_prompt=True
+    )
     inputs = chat_tokenizer(prompt, return_tensors="pt")
+
+    # Génération déterministe (greedy) : on veut un JSON stable, pas de créativité
     outputs = chat_model.generate(
         **inputs,
         max_new_tokens=request.max_tokens,
-        temperature=request.temperature,
-        do_sample=True,
+        do_sample=False,
     )
-    response_text = chat_tokenizer.decode(outputs[0], skip_special_tokens=True)
-    response_text = response_text.split("Assistant:")[-1].strip()
+    # On ne décode que les tokens générés (on retire le prompt)
+    generated = outputs[0][inputs["input_ids"].shape[-1]:]
+    response_text = chat_tokenizer.decode(generated, skip_special_tokens=True).strip()
 
     return {
         "id": f"chatcmpl-{int(time.time())}",
