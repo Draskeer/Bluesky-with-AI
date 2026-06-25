@@ -1,6 +1,6 @@
 QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 QDRANT_API_KEY="${QDRANT_API_KEY:-}"
-COLLECTION_NAME="news"
+COLLECTION_NAME="news_articles"
 
 echo "🚀 Création de la collection '$COLLECTION_NAME' sur $QDRANT_URL..."
 

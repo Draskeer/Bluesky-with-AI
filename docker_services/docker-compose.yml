@@ -62,20 +62,26 @@ services:
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:5678/
       - N8N_USER_FOLDER=/home/node/.n8n
-      # Clé de chiffrement épinglée -> credentials reproductibles entre redémarrages
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      # Configuration simplifiée
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      # Compte owner cree automatiquement au demarrage via init-wrapper.sh
+      - N8N_OWNER_EMAIL=${N8N_OWNER_EMAIL}
+      - N8N_OWNER_PASSWORD=${N8N_OWNER_PASSWORD}
+      - N8N_OWNER_FIRSTNAME=${N8N_OWNER_FIRSTNAME:-Admin}
+      - N8N_OWNER_LASTNAME=${N8N_OWNER_LASTNAME:-User}
     volumes:
       - n8n-data:/home/node/.n8n
       - ./n8n/data_tables:/home/node/.n8n/data_tables
       - ./n8n/workflows:/home/node/workflows:ro
+      - ./n8n/provisioning:/home/node/provisioning:ro
+      - ./n8n/init-wrapper.sh:/home/node/init-wrapper.sh:ro
     networks:
       - llm-network
     depends_on:
       - llm-server
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "/home/node/init-wrapper.sh"]
     healthcheck:
       test:
         [

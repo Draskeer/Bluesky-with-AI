@@ -1,14 +1,11 @@
 #!/bin/sh
-# Provisioning automatique de n8n : credentials + data tables de logs + workflows.
-# Exécuté par le conteneur n8n-init, une fois n8n démarré (DB partagée via volume).
+# Provisioning n8n : credentials + data tables + workflows.
+# Execute par n8n-init apres que n8n soit healthy (owner deja cree par init-wrapper.sh).
 set -e
 
 echo "=== n8n provisioning ==="
 
-# ---------------------------------------------------------------------------
-# 1. Credentials (data en clair -> n8n les chiffre à l'import, IDs fixes)
-#    Les IDs correspondent à ceux référencés dans les workflows.
-# ---------------------------------------------------------------------------
+# 1. Credentials (n8n les chiffre a l import avec N8N_ENCRYPTION_KEY, IDs fixes)
 cat > /tmp/credentials.json <<JSON
 [
   {
@@ -46,23 +43,19 @@ cat > /tmp/credentials.json <<JSON
 JSON
 
 echo "--- Import des credentials ---"
-n8n import:credentials --input=/tmp/credentials.json || echo "import credentials: échec (owner pas encore créé ?)"
+n8n import:credentials --input=/tmp/credentials.json || echo "import credentials: echec"
 
-# ---------------------------------------------------------------------------
-# 2. Data tables de logs (IDs fixes via insertion SQLite directe, idempotent)
-# ---------------------------------------------------------------------------
-echo "--- Création des data tables de logs ---"
-node /home/node/provisioning/seed-datatables.js || echo "seed data tables: échec"
+# 2. Data tables de logs
+echo "--- Creation des data tables de logs ---"
+node /home/node/provisioning/seed-datatables.js || echo "seed data tables: echec"
 
-# ---------------------------------------------------------------------------
 # 3. Workflows
-# ---------------------------------------------------------------------------
 echo "--- Import des workflows ---"
 for wf in /home/node/workflows/*.json; do
   [ -f "$wf" ] || continue
   echo "Import: $(basename "$wf")"
-  n8n import:workflow --input="$wf" || echo "  (déjà existant ou erreur)"
+  n8n import:workflow --input="$wf" || echo "  (deja existant ou erreur)"
 done
 
-echo "=== provisioning terminé ==="
-echo "NOTE: active le workflow via le toggle de l'UI (http://localhost:5678)."
+echo "=== provisioning termine ==="
+echo "NOTE: active le workflow via le toggle de l UI (http://localhost:5678)."
