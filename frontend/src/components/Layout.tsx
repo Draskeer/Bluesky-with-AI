@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/auth.store";
 import { useThemeStore } from "../store/theme.store";
 import ComposePost from "./ComposePost";
+import ProfileDashboard from "./ProfileDashboard";
+import { api } from "../services/api";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +18,22 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
+
+  // Detect profile page and resolve DID for the dashboard
+  const profileMatch = location.pathname.match(/^\/profile\/(.+)$/);
+  const profileHandle = profileMatch ? decodeURIComponent(profileMatch[1]) : null;
+  const [profileDid, setProfileDid] = useState<string | null>(null);
+
+  useEffect(() => {
+    setProfileDid(null);
+    if (!profileHandle) return;
+    let cancelled = false;
+    api.profiles.get(profileHandle).then(res => {
+      if (cancelled) return;
+      if (res.success && res.data) setProfileDid(res.data.did);
+    });
+    return () => { cancelled = true; };
+  }, [profileHandle]);
 
   const moods: { value: Mood; emoji: string; label: string; color: string }[] = [
     { value: 'happy', emoji: '😊', label: 'Happy', color: 'hover:bg-green-500/20 hover:border-green-500' },
@@ -178,47 +196,56 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Right Sidebar */}
         <aside className="hidden xl:block w-[350px] p-4 flex-shrink-0">
-          {/* Today's Mood */}
-          <div className="bg-[#1c2938] rounded-2xl p-3 border border-[#2f3e4e] mb-4">
-            <h2 className="text-white font-bold text-sm mb-2">Today's mood</h2>
-            <div className="flex justify-between gap-1.5">
-              {moods.map((mood) => (
-                <button
-                  key={mood.value}
-                  onClick={() => setSelectedMood(selectedMood === mood.value ? null : mood.value)}
-                  className={`flex-1 flex flex-col items-center gap-0.5 p-2 rounded-lg border-2 transition-all ${
-                    selectedMood === mood.value
-                      ? 'border-[#1da1f2] bg-[#1da1f2]/10'
-                      : `border-[#2f3e4e] ${mood.color}`
-                  }`}
-                  title={mood.label}
-                >
-                  <span className="text-xl">{mood.emoji}</span>
-                  <span className="text-[10px] text-[#8899a6] font-medium">{mood.label}</span>
-                </button>
-              ))}
+          {/* Profile Dashboard — shown when viewing a profile */}
+          {profileHandle && profileDid ? (
+            <div className="mb-4">
+              <ProfileDashboard key={profileDid} did={profileDid} handle={profileHandle} />
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Today's Mood */}
+              <div className="bg-[#1c2938] rounded-2xl p-3 border border-[#2f3e4e] mb-4">
+                <h2 className="text-white font-bold text-sm mb-2">Today's mood</h2>
+                <div className="flex justify-between gap-1.5">
+                  {moods.map((mood) => (
+                    <button
+                      key={mood.value}
+                      onClick={() => setSelectedMood(selectedMood === mood.value ? null : mood.value)}
+                      className={`flex-1 flex flex-col items-center gap-0.5 p-2 rounded-lg border-2 transition-all ${
+                        selectedMood === mood.value
+                          ? 'border-[#1da1f2] bg-[#1da1f2]/10'
+                          : `border-[#2f3e4e] ${mood.color}`
+                      }`}
+                      title={mood.label}
+                    >
+                      <span className="text-xl">{mood.emoji}</span>
+                      <span className="text-[10px] text-[#8899a6] font-medium">{mood.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Trending */}
-          <div className="bg-[#1c2938] rounded-2xl overflow-hidden mb-4">
-            <div className="p-4 border-b border-[#2f3e4e]">
-              <h2 className="text-white font-extrabold text-xl">Trending</h2>
-            </div>
-            <div className="p-4 text-[#8899a6] text-sm">
-              Les tendances seront bientôt disponibles
-            </div>
-          </div>
+              {/* Trending */}
+              <div className="bg-[#1c2938] rounded-2xl overflow-hidden mb-4">
+                <div className="p-4 border-b border-[#2f3e4e]">
+                  <h2 className="text-white font-extrabold text-xl">Trending</h2>
+                </div>
+                <div className="p-4 text-[#8899a6] text-sm">
+                  Les tendances seront bientôt disponibles
+                </div>
+              </div>
 
-          <div className="bg-[#1c2938] rounded-2xl overflow-hidden mb-4">
-            <div className="p-4 border-b border-[#2f3e4e]">
-              <h2 className="text-white font-extrabold text-xl">Suggested follows</h2>
-            </div>
-            <div className="p-4 text-[#8899a6] text-sm">
-              Suggestions de comptes à suivre
-            </div>
-          </div>
-          
+              <div className="bg-[#1c2938] rounded-2xl overflow-hidden mb-4">
+                <div className="p-4 border-b border-[#2f3e4e]">
+                  <h2 className="text-white font-extrabold text-xl">Suggested follows</h2>
+                </div>
+                <div className="p-4 text-[#8899a6] text-sm">
+                  Suggestions de comptes à suivre
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="text-[#8899a6] text-xs p-4">
             <p>Terms · Privacy · Cookies</p>
             <p className="mt-1">© 2024 Bluesky Client</p>
