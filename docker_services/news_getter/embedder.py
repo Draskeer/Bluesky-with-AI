@@ -1,13 +1,16 @@
 """
 Generates sentence embeddings using fastembed (ONNX-based, no PyTorch needed).
 
-Model: BAAI/bge-small-en-v1.5
+Model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
   - 384-dimensional vectors
-  - ~130 MB on disk
-  - Fast CPU inference
+  - multilingue (FR + EN + ~50 langues) -> récupération cross-langue correcte
+  - léger (~0.22 GB) et rapide en CPU : tient dans l'enveloppe mémoire Docker
+    partagée (e5-large 2.2 GB faisait planter le conteneur en OOM).
 
-The model is pre-downloaded during the Docker build step, so there is no
-network access required at runtime.
+Modèle "paraphrase" symétrique : PAS de préfixe query:/passage: (contrairement
+à e5). On embed le texte brut des deux côtés (news indexées et message requête).
+
+Le modèle est pré-téléchargé à l'étape de build Docker (offline au runtime).
 """
 
 import logging
@@ -19,7 +22,7 @@ from fastembed import TextEmbedding  # noqa: E402 — must come after env var is
 
 logger = logging.getLogger(__name__)
 
-MODEL_NAME = "BAAI/bge-small-en-v1.5"
+MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 VECTOR_SIZE = 384  # must match the Qdrant collection config in store.py
 
 _model: TextEmbedding | None = None
@@ -32,6 +35,18 @@ def _get_model() -> TextEmbedding:
         _model = TextEmbedding(model_name=MODEL_NAME)
         logger.info("Embedding model ready.")
     return _model
+
+
+def embed_texts(texts: list[str]) -> list[list[float]]:
+    """Embeds une requête (message entrant) dans le même espace que les articles.
+
+    Utilisé par l'endpoint /embed pour que le pipeline n8n recherche le message
+    dans le *même* espace vectoriel que les news indexées (RAG correct).
+    """
+    if not texts:
+        return []
+    model = _get_model()
+    return [vector.tolist() for vector in model.embed(texts)]
 
 
 def embed_articles(articles: list[dict]) -> list[dict]:

@@ -19,7 +19,7 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "news_articles"
-VECTOR_SIZE = 384  # must match embedder.py
+VECTOR_SIZE = 384  # must match embedder.py (paraphrase-multilingual-MiniLM-L12-v2)
 
 
 # ---------------------------------------------------------------------------
@@ -63,12 +63,29 @@ def wait_for_qdrant(max_retries: int = 30, delay: int = 10) -> bool:
 
 def _ensure_collection(client: QdrantClient) -> None:
     existing = {c.name for c in client.get_collections().collections}
-    if COLLECTION_NAME not in existing:
-        client.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+
+    if COLLECTION_NAME in existing:
+        # Si la dimension stockée ne correspond plus (changement de modèle
+        # d'embedding), on recrée la collection : mélanger des vecteurs de
+        # tailles/espaces différents rendrait la recherche incohérente.
+        try:
+            info = client.get_collection(COLLECTION_NAME)
+            current = info.config.params.vectors.size
+        except Exception:
+            current = None
+        if current == VECTOR_SIZE:
+            return
+        logger.warning(
+            f"Collection '{COLLECTION_NAME}' a une dimension {current} != {VECTOR_SIZE} "
+            f"-> recréation (ré-embedding complet)."
         )
-        logger.info(f"Created Qdrant collection '{COLLECTION_NAME}'.")
+        client.delete_collection(COLLECTION_NAME)
+
+    client.create_collection(
+        collection_name=COLLECTION_NAME,
+        vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+    )
+    logger.info(f"Created Qdrant collection '{COLLECTION_NAME}' (size={VECTOR_SIZE}).")
 
 
 # ---------------------------------------------------------------------------

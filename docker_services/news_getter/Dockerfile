@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Pre-download the embedding model at build time so it is
 # available offline at runtime (avoids cold-start delay)
 ENV FASTEMBED_CACHE_PATH=/app/models
-RUN python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='BAAI/bge-small-en-v1.5').embed(['warmup']))"
+RUN python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2').embed(['warmup']))"
 
 COPY . .
 
