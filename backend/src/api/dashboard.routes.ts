@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getUserDashboard } from '../services/db.js';
+import { getUserDashboard, getPool } from '../services/db.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
@@ -29,6 +29,32 @@ router.get('/:did', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Dashboard error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch dashboard' });
+  }
+});
+
+router.get('/:did/score', async (req: Request, res: Response) => {
+  try {
+    const { did } = req.params;
+    const db = getPool();
+    const prefix = `at://${did}/`;
+    const result = await db.query(
+      `SELECT
+         COUNT(CASE WHEN confidence > 0 THEN 1 END)                           AS verified_total,
+         SUM(CASE WHEN is_fake = true AND confidence > 0 THEN 1 ELSE 0 END)  AS fake_count,
+         AVG(CASE WHEN confidence > 0 THEN confidence END)                    AS avg_confidence
+       FROM messages
+       WHERE message_id LIKE $1`,
+      [prefix + '%']
+    );
+    const row = result.rows[0];
+    const verifiedTotal = parseInt(row.verified_total) || 0;
+    const fakeRate = verifiedTotal > 0 ? (parseInt(row.fake_count) || 0) / verifiedTotal : 0;
+    const avgConf = parseFloat(row.avg_confidence) || 0;
+    const trustScore = verifiedTotal > 0 ? (1 - fakeRate) * avgConf : 0.5;
+    res.json({ success: true, data: { trustScore: Math.round(trustScore * 100) / 100 } });
+  } catch (error) {
+    logger.error('Trust score error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch trust score' });
   }
 });
 

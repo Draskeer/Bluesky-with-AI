@@ -120,7 +120,7 @@ function SentimentBar({
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
-      <span className="text-xs text-gray-300 w-8">{count}</span>
+      <span className="text-xs text-gray-300 w-10 text-right">{pct.toFixed(1)}%</span>
     </div>
   );
 }
@@ -132,91 +132,165 @@ function TimelineChart({
   data: TimelinePoint[];
   range: Range;
 }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   if (data.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-gray-500 text-xs">
-        Aucune donnee sur cette periode
+        Aucune donnée sur cette période
       </div>
     );
   }
 
-  const maxTotal = Math.max(
-    ...data.map((d) => d.positive + d.neutral + d.negative),
+  const W = 320;
+  const H = 110;
+  const PAD = { top: 8, right: 8, bottom: 20, left: 20 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  const maxVal = Math.max(
+    ...data.flatMap((d) => [d.positive, d.neutral, d.negative]),
     1
   );
 
+  const getX = (i: number) =>
+    PAD.left + (data.length === 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);
+  const getY = (val: number) =>
+    PAD.top + chartH - (val / maxVal) * chartH;
+
+  // Smooth bezier path (monotone cubic)
+  const buildPath = (values: number[]): string => {
+    if (values.length === 0) return "";
+    if (values.length === 1) return `M ${getX(0)} ${getY(values[0])}`;
+    const pts = values.map((v, i) => [getX(i), getY(v)] as [number, number]);
+    let d = `M ${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1];
+      const [x1, y1] = pts[i];
+      const cpx = (x0 + x1) / 2;
+      d += ` C ${cpx} ${y0} ${cpx} ${y1} ${x1} ${y1}`;
+    }
+    return d;
+  };
+
+  const posPath = buildPath(data.map((d) => d.positive));
+  const neuPath = buildPath(data.map((d) => d.neutral));
+  const negPath = buildPath(data.map((d) => d.negative));
+
+  // Which x-axis labels to show
+  const step = data.length <= 7 ? 1 : Math.ceil(data.length / 6);
+  const showLabel = (i: number) =>
+    i % step === 0 || i === data.length - 1;
+
+  const hovered = hoveredIdx !== null ? data[hoveredIdx] : null;
+
+  // Tooltip x clamped so it doesn't overflow
+  const tooltipX = hoveredIdx !== null
+    ? Math.max(10, Math.min(getX(hoveredIdx), W - 80))
+    : 0;
+
   return (
-    <div className="flex items-end gap-[3px] h-32">
-      {data.map((point) => {
-        const total = point.positive + point.neutral + point.negative;
-        const hPct = (total / maxTotal) * 100;
-        const pPos = total > 0 ? (point.positive / total) * 100 : 0;
-        const pNeu = total > 0 ? (point.neutral / total) * 100 : 0;
-        const pNeg = total > 0 ? (point.negative / total) * 100 : 0;
+    <div className="relative select-none">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        style={{ height: "128px" }}
+      >
+        {/* Horizontal grid lines */}
+        {[0, 0.5, 1].map((pct) => (
+          <line
+            key={pct}
+            x1={PAD.left}
+            y1={PAD.top + chartH * (1 - pct)}
+            x2={W - PAD.right}
+            y2={PAD.top + chartH * (1 - pct)}
+            stroke="#2f3e4e"
+            strokeWidth="0.5"
+          />
+        ))}
 
-        return (
-          <div
-            key={point.period}
-            className="flex-1 flex flex-col items-center gap-1 group relative"
-          >
-            {/* Tooltip */}
-            <div className="absolute bottom-full mb-1 hidden group-hover:block z-10 pointer-events-none">
-              <div className="bg-[#0a1627] border border-[#2f3e4e] rounded-lg px-2 py-1.5 text-[10px] text-gray-300 whitespace-nowrap shadow-lg">
-                <div className="font-semibold text-white mb-0.5">
-                  {formatPeriodLabel(point.period, range)}
-                </div>
-                <div className="text-green-400">
-                  Positif: {point.positive}
-                </div>
-                <div className="text-gray-400">
-                  Neutre: {point.neutral}
-                </div>
-                <div className="text-red-400">
-                  Negatif: {point.negative}
-                </div>
-                {point.fake_count > 0 && (
-                  <div className="text-orange-400 mt-0.5">
-                    Fake: {point.fake_count}
-                  </div>
-                )}
-              </div>
-            </div>
+        {/* Sentiment curves */}
+        <path d={posPath} fill="none" stroke="#22c55e" strokeWidth="1.8" strokeLinecap="round" />
+        <path d={neuPath} fill="none" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" />
+        <path d={negPath} fill="none" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" />
 
-            {/* Stacked bar */}
-            <div
-              className="w-full rounded-t-sm overflow-hidden flex flex-col-reverse cursor-pointer"
-              style={{ height: `${hPct}%`, minHeight: total > 0 ? "4px" : "0" }}
+        {/* Dots */}
+        {data.map((point, i) => (
+          <g key={point.period}>
+            <circle cx={getX(i)} cy={getY(point.positive)} r="2.5" fill="#22c55e" />
+            <circle cx={getX(i)} cy={getY(point.neutral)} r="2.5" fill="#6b7280" />
+            <circle cx={getX(i)} cy={getY(point.negative)} r="2.5" fill="#ef4444" />
+          </g>
+        ))}
+
+        {/* Hover vertical line */}
+        {hoveredIdx !== null && (
+          <line
+            x1={getX(hoveredIdx)}
+            y1={PAD.top}
+            x2={getX(hoveredIdx)}
+            y2={PAD.top + chartH}
+            stroke="#4b6070"
+            strokeWidth="1"
+            strokeDasharray="3 2"
+          />
+        )}
+
+        {/* Invisible hover zones */}
+        {data.map((_, i) => {
+          const x = getX(i);
+          const zoneW = data.length === 1 ? chartW : chartW / (data.length - 1);
+          return (
+            <rect
+              key={i}
+              x={x - zoneW / 2}
+              y={PAD.top}
+              width={zoneW}
+              height={chartH}
+              fill="transparent"
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              style={{ cursor: "crosshair" }}
+            />
+          );
+        })}
+
+        {/* X-axis labels */}
+        {data.map((point, i) =>
+          showLabel(i) ? (
+            <text
+              key={point.period}
+              x={getX(i)}
+              y={H - 3}
+              textAnchor="middle"
+              fill="#6b7280"
+              fontSize="7"
             >
-              {pNeg > 0 && (
-                <div
-                  className="w-full bg-red-500/80"
-                  style={{ height: `${pNeg}%` }}
-                />
-              )}
-              {pNeu > 0 && (
-                <div
-                  className="w-full bg-gray-500/60"
-                  style={{ height: `${pNeu}%` }}
-                />
-              )}
-              {pPos > 0 && (
-                <div
-                  className="w-full bg-green-500/80"
-                  style={{ height: `${pPos}%` }}
-                />
-              )}
-            </div>
+              {formatPeriodLabel(point.period, range)}
+            </text>
+          ) : null
+        )}
+      </svg>
 
-            {/* X label — show only a few to avoid clutter */}
-            {(data.length <= 12 ||
-              data.indexOf(point) % Math.ceil(data.length / 7) === 0) && (
-              <span className="text-[8px] text-gray-500 leading-none truncate w-full text-center">
-                {formatPeriodLabel(point.period, range)}
-              </span>
+      {/* HTML tooltip */}
+      {hovered && hoveredIdx !== null && (
+        <div
+          className="absolute top-0 pointer-events-none z-10"
+          style={{ left: `${(tooltipX / W) * 100}%` }}
+        >
+          <div className="bg-[#0a1627] border border-[#2f3e4e] rounded-lg px-2 py-1.5 text-[10px] text-gray-300 whitespace-nowrap shadow-lg">
+            <div className="font-semibold text-white mb-0.5">
+              {formatPeriodLabel(hovered.period, range)}
+            </div>
+            <div className="text-green-400">Positif : {hovered.positive}</div>
+            <div className="text-gray-400">Neutre : {hovered.neutral}</div>
+            <div className="text-red-400">Négatif : {hovered.negative}</div>
+            {hovered.fake_count > 0 && (
+              <div className="text-orange-400 mt-0.5">Fake : {hovered.fake_count}</div>
             )}
           </div>
-        );
-      })}
+        </div>
+      )}
     </div>
   );
 }
@@ -274,6 +348,13 @@ export default function ProfileDashboard({
     data.sentimentSummary.neutral +
     data.sentimentSummary.negative;
 
+  // Trust score calculé côté client depuis les vraies stats de la période.
+  // On ignore data.trustScore (peut être 0.5 si users.trust_rate n'est pas à jour).
+  const periodTrustScore =
+    data.messageCount > 0
+      ? (1 - data.fakeRate) * data.avgConfidence
+      : 0.5;
+
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -296,7 +377,7 @@ export default function ProfileDashboard({
         </h2>
 
         {/* Trust Score Gauge */}
-        <TrustGauge score={data.trustScore} />
+        <TrustGauge score={periodTrustScore} />
 
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-2 mt-3">

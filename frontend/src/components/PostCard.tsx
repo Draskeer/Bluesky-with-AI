@@ -36,15 +36,29 @@ const MOOD_DISPLAY: Record<Mood, { emoji: string; label: string }> = {
   negative: { emoji: "😞", label: "Négatif" },
 };
 
-// Génère un fake trust score basé sur le handle (pour avoir un score cohérent par utilisateur)
-const getFakeTrustScore = (handle: string): number => {
-  let hash = 0;
-  for (let i = 0; i < handle.length; i++) {
-    hash = ((hash << 5) - hash) + handle.charCodeAt(i);
-    hash |= 0;
+// Cache module-level pour éviter un appel DB par post pour le même auteur
+const _trustScorePromises = new Map<string, Promise<number>>();
+
+function _fetchAuthorTrustScore(did: string): Promise<number> {
+  if (!_trustScorePromises.has(did)) {
+    const p = api.dashboard.get(did, '', 'year').then(res => {
+      const d = res.data;
+      if (!d || d.messageCount === 0) return 50;
+      const score = (1 - d.fakeRate) * d.avgConfidence;
+      return Math.round(score * 100);
+    });
+    _trustScorePromises.set(did, p);
   }
-  return Math.abs(hash % 100);
-};
+  return _trustScorePromises.get(did)!;
+}
+
+function useAuthorTrustScore(did: string): number {
+  const [score, setScore] = useState<number>(50);
+  useEffect(() => {
+    _fetchAuthorTrustScore(did).then(setScore);
+  }, [did]);
+  return score;
+}
 
 // Retourne la couleur selon le score
 const getTrustScoreColor = (score: number): string => {
@@ -64,16 +78,6 @@ const getTrustScoreBg = (score: number): string => {
   return "bg-red-400/10";
 };
 
-// Génère un fake trust score pour le contenu du post (basé sur le texte + URI)
-const getPostTrustScore = (text: string, uri: string): number => {
-  const combined = text + uri;
-  let hash = 0;
-  for (let i = 0; i < combined.length; i++) {
-    hash = ((hash << 5) - hash) + combined.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash % 100);
-};
 
 // Retourne le label selon le score
 const getTrustLabel = (score: number): string => {
@@ -259,6 +263,7 @@ export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPo
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
 
+  const authorTrustScore = useAuthorTrustScore(post.author.did);
   const isRepost = reason?.$type === "app.bsky.feed.defs#reasonRepost";
   const repostBy = isRepost ? reason?.by : null;
 
@@ -781,8 +786,6 @@ export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPo
 
   // Action buttons component
   const ActionButtons = ({ compact = false }: { compact?: boolean }) => {
-    const postTrustScore = getPostTrustScore(post.record.text || "", post.uri);
-    
     return (
     <div className={`flex items-center ${compact ? "justify-around" : "justify-between"} text-gray-500`}>
       <div className={`flex items-center ${compact ? "justify-around flex-1" : "justify-between max-w-[400px] flex-1"}`}>
@@ -879,7 +882,7 @@ export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPo
 
       {/* Analyse IA : bouton « Analyser » à la demande, puis spinner/résultat.
           Pour les réponses, pas de onStart -> AiBadge retombe sur le score fallback. */}
-      <AiBadge analysis={effectiveAnalysis} fallbackScore={postTrustScore} onStart={handleStartAnalysis} />
+      <AiBadge analysis={effectiveAnalysis} fallbackScore={authorTrustScore} onStart={handleStartAnalysis} />
     </div>
     );
   };
@@ -1012,10 +1015,10 @@ export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPo
                 {/* Trust Score Badge AFTER date */}
                 <span className="text-gray-500">·</span>
                 <span 
-                  className={`text-xs font-medium px-1.5 py-0.5 rounded ${getTrustScoreColor(getFakeTrustScore(post.author.handle))} ${getTrustScoreBg(getFakeTrustScore(post.author.handle))}`}
+                  className={`text-xs font-medium px-1.5 py-0.5 rounded ${getTrustScoreColor(authorTrustScore)} ${getTrustScoreBg(authorTrustScore)}`}
                   title="Trust Score Utilisateur"
                 >
-                  🛡️ {getFakeTrustScore(post.author.handle)}%
+                  🛡️ {authorTrustScore}%
                 </span>
               </div>
               
@@ -1114,11 +1117,11 @@ export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPo
               </span>
               {/* Trust Score Badge AFTER date */}
               <span className="text-gray-500">·</span>
-              <span 
-                className={`text-xs font-medium px-1.5 py-0.5 rounded ${getTrustScoreColor(getFakeTrustScore(post.author.handle))} ${getTrustScoreBg(getFakeTrustScore(post.author.handle))}`}
+              <span
+                className={`text-xs font-medium px-1.5 py-0.5 rounded ${getTrustScoreColor(authorTrustScore)} ${getTrustScoreBg(authorTrustScore)}`}
                 title="Trust Score Utilisateur"
               >
-                🛡️ {getFakeTrustScore(post.author.handle)}%
+                🛡️ {authorTrustScore}%
               </span>
             </div>
             

@@ -157,6 +157,9 @@ export const api = {
   },
 
   dashboard: {
+    trustScore: async (did: string): Promise<ApiResponse<{ trustScore: number }>> => {
+      return request(`/dashboard/${encodeURIComponent(did)}/score`);
+    },
     get: async (
       did: string,
       handle: string,
