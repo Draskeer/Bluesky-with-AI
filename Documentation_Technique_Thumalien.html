@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thumalien — Documentation technique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B1B2B;        /* navy profond — couvertures & blocs sombres */
+    --ink-2:#102A40;
+    --paper:#F7F9FB;      /* blanc froid — fond document */
+    --paper-2:#ECF1F6;
+    --card:#FFFFFF;
+    --text:#16263A;
+    --muted:#5C7187;
+    --faint:#8497A9;
+    --line:#D6E0EA;
+    --line-2:#C2D0DD;
+    --azure:#1B6CC9;      /* accent primaire */
+    --azure-deep:#123F7C;
+    --azure-wash:#E8F0FA;
+    --real:#0E9E83;       /* verdict — information corroborée */
+    --real-wash:#E2F4EF;
+    --fake:#E0533D;       /* verdict — contradiction détectée */
+    --fake-wash:#FCEAE6;
+    --unv:#C98A12;        /* verdict — non vérifiable */
+    --unv-wash:#FBF1DC;
+    --maxw:50rem;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--text);
+    font-family:"Newsreader",Georgia,serif;
+    font-size:17px;
+    line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  .doc{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+
+  /* ---------- type ---------- */
+  h1,h2,h3,h4,.eyebrow,.label,.mono,.chip,.metric-v,.legend,.svgtxt{
+    font-family:"Space Grotesk",-apple-system,system-ui,sans-serif;
+  }
+  .mono,code,pre,.data{font-family:"Space Mono","SFMono-Regular",ui-monospace,monospace}
+
+  p{margin:0 0 1.05em}
+  a{color:var(--azure-deep);text-decoration:none;border-bottom:1px solid var(--line-2)}
+  strong{font-weight:600;color:#0d1f30}
+  em{color:#33485c}
+
+  .eyebrow{
+    font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--azure);display:flex;align-items:center;gap:12px;margin:0 0 14px;
+  }
+  .eyebrow::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line-2),transparent)}
+  .eyebrow .num{
+    font-family:"Space Mono",monospace;font-weight:700;color:var(--ink);
+    background:var(--azure-wash);border:1px solid #cfe0f4;border-radius:4px;
+    padding:1px 7px;font-size:11px;letter-spacing:.04em;
+  }
+
+  h2{font-size:30px;line-height:1.12;font-weight:600;letter-spacing:-.018em;color:var(--ink);margin:0 0 .55em}
+  h3{font-size:20px;font-weight:600;letter-spacing:-.01em;color:var(--azure-deep);margin:2.2em 0 .5em}
+  h4{font-size:14px;font-weight:600;letter-spacing:.02em;color:var(--ink);margin:1.6em 0 .4em;text-transform:none}
+
+  section{padding:46px 0}
+  section + section{border-top:1px solid var(--line)}
+
+  /* ---------- cover ---------- */
+  .cover{
+    background:
+      radial-gradient(120% 80% at 85% -10%, #1c3f63 0%, transparent 55%),
+      radial-gradient(90% 70% at -10% 110%, #16314c 0%, transparent 50%),
+      var(--ink);
+    color:#E7EFF7;position:relative;overflow:hidden;
+    min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;
+    padding:64px max(28px,calc((100vw - var(--maxw))/2 + 28px));
+  }
+  .cover .veil{position:absolute;inset:0;opacity:.5;pointer-events:none}
+  .cover-top{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:2;gap:16px}
+  .brandmark{display:flex;align-items:center;gap:13px;font-family:"Space Grotesk";font-weight:600;letter-spacing:.02em}
+  .brandmark .glyph{width:30px;height:30px}
+  .cover-tag{
+    font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+    color:#9DB6CF;text-align:right;line-height:1.7
+  }
+  .cover-mid{position:relative;z-index:2;margin:auto 0}
+  .cover-kicker{
+    font-family:"Space Mono",monospace;font-size:12.5px;letter-spacing:.26em;text-transform:uppercase;
+    color:#7FA8D6;margin-bottom:22px
+  }
+  .cover h1{
+    font-family:"Space Grotesk";font-weight:600;letter-spacing:-.028em;line-height:1.02;
+    font-size:clamp(44px,8.5vw,86px);margin:0;color:#fff
+  }
+  .cover h1 .accent{
+    background:linear-gradient(92deg,#6FC8E8,#3D8FD8);-webkit-background-clip:text;background-clip:text;color:transparent
+  }
+  .cover-sub{
+    font-family:"Newsreader",serif;font-size:clamp(18px,2.4vw,23px);color:#C5D6E8;
+    max-width:33em;margin:26px 0 0;line-height:1.5
+  }
+  .cover-verdicts{display:flex;gap:10px;margin-top:34px;flex-wrap:wrap;position:relative;z-index:2}
+  .vchip{
+    font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.05em;
+    padding:6px 12px 6px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:8px;
+    border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04);color:#D7E4F1
+  }
+  .vchip .dot{width:8px;height:8px;border-radius:50%}
+  .cover-bottom{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:flex-end;
+    gap:24px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.12);padding-top:24px}
+  .cover-meta{display:grid;grid-template-columns:repeat(2,auto);gap:6px 40px}
+  .cover-meta .k{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#7E99B5}
+  .cover-meta .v{font-family:"Space Grotesk";font-size:14px;color:#E7EFF7;font-weight:500;margin-top:1px}
+  .cover-repo{font-family:"Space Mono",monospace;font-size:12px;color:#9DB6CF}
+  .cover-repo a{color:#9DCBEE;border:none}
+
+  /* ---------- lede ---------- */
+  .lede{font-size:21px;line-height:1.5;color:#26384a;font-weight:400}
+  .lede .drop{
+    float:left;font-family:"Space Grotesk";font-weight:600;font-size:64px;line-height:.82;
+    padding:6px 14px 0 0;color:var(--azure)
+  }
+
+  /* ---------- TOC ---------- */
+  .toc{display:grid;grid-template-columns:1fr 1fr;gap:2px 38px}
+  .toc a{
+    display:flex;align-items:baseline;gap:12px;border:none;padding:9px 0;
+    border-bottom:1px solid var(--line);color:var(--text)
+  }
+  .toc a:hover{color:var(--azure-deep)}
+  .toc .tn{font-family:"Space Mono",monospace;font-size:12px;color:var(--faint);min-width:24px}
+  .toc .tt{font-family:"Space Grotesk";font-size:15px;font-weight:500}
+
+  /* ---------- callouts / cards ---------- */
+  .callout{
+    background:var(--card);border:1px solid var(--line);border-left:3px solid var(--azure);
+    border-radius:8px;padding:18px 20px;margin:22px 0;font-size:15.5px;line-height:1.55
+  }
+  .callout.real{border-left-color:var(--real);background:linear-gradient(0deg,#fff,#fff),var(--real-wash)}
+  .callout.fake{border-left-color:var(--fake)}
+  .callout.note{border-left-color:var(--unv)}
+  .callout .ct{font-family:"Space Grotesk";font-weight:600;font-size:12px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block}
+  .callout.real .ct{color:#0a7a66}
+  .callout.fake .ct{color:#b53b27}
+  .callout.note .ct{color:#9a6c0d}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+  .card h4{margin:0 0 .35em}
+  .card p{font-size:14.5px;color:#33485c;margin:0;line-height:1.5}
+  .card .pill{font-family:"Space Mono",monospace;font-size:10.5px;color:var(--azure-deep);
+    background:var(--azure-wash);border-radius:4px;padding:2px 7px;display:inline-block;margin-bottom:10px;letter-spacing:.03em}
+
+  /* ---------- metrics ---------- */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}
+  .metric{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 16px 14px;position:relative;overflow:hidden}
+  .metric::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--azure)}
+  .metric.r::before{background:var(--real)} .metric.f::before{background:var(--fake)} .metric.u::before{background:var(--unv)}
+  .metric-v{font-size:26px;font-weight:600;color:var(--ink);letter-spacing:-.02em;line-height:1}
+  .metric-l{font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:8px;line-height:1.4}
+
+  /* ---------- tables ---------- */
+  .tbl{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}
+  .tbl th{
+    font-family:"Space Grotesk";font-weight:600;text-align:left;font-size:11px;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--muted);padding:9px 12px;border-bottom:2px solid var(--line-2);white-space:nowrap
+  }
+  .tbl td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.45}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl tbody tr:hover{background:var(--paper-2)}
+  .tbl .mono,.tbl code{font-size:12.5px;color:var(--azure-deep)}
+  .tbl .src{color:#33485c}
+
+  .chip{display:inline-block;font-family:"Space Mono",monospace;font-size:11px;padding:2px 8px;border-radius:5px;
+    background:var(--paper-2);border:1px solid var(--line);color:#35495d;letter-spacing:.02em}
+  .chip.real{background:var(--real-wash);border-color:#bfe6dc;color:#0a7a66}
+  .chip.fake{background:var(--fake-wash);border-color:#f3ccc3;color:#b53b27}
+  .chip.unv{background:var(--unv-wash);border-color:#ecd9a8;color:#9a6c0d}
+
+  /* ---------- code ---------- */
+  pre{
+    background:var(--ink);color:#D6E3F0;border-radius:10px;padding:18px 20px;overflow:auto;
+    font-size:13px;line-height:1.62;margin:20px 0;border:1px solid #1d3850}
+  pre .c{color:#6f8aa6} /* comment */
+  pre .k{color:#8FD0F0} /* keyword/key */
+  pre .s{color:#9FE0C6} /* string/value */
+  pre .p{color:#E3A78f} /* path/accent */
+  code{background:var(--paper-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:var(--azure-deep)}
+  pre code{background:none;border:none;padding:0;color:inherit;font-size:inherit}
+
+  /* ---------- figure ---------- */
+  figure{margin:26px 0}
+  .figbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 18px;overflow:hidden}
+  figcaption{font-family:"Space Mono",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--muted);
+    margin-top:11px;display:flex;gap:9px;align-items:baseline}
+  figcaption .fno{color:var(--azure);font-weight:700}
+  .svgtxt{font-family:"Space Grotesk",sans-serif}
+  .svgmono{font-family:"Space Mono",monospace}
+
+  /* ---------- stage list ---------- */
+  .stage{display:grid;grid-template-columns:46px 1fr;gap:20px;padding:22px 0;border-bottom:1px solid var(--line)}
+  .stage:last-child{border-bottom:none}
+  .stage .sno{
+    font-family:"Space Grotesk";font-weight:600;font-size:13px;color:#fff;background:var(--ink);
+    width:46px;height:46px;border-radius:11px;display:flex;align-items:center;justify-content:center;letter-spacing:.02em
+  }
+  .stage.gate .sno{background:var(--azure)}
+  .stage.real .sno{background:var(--real)}
+  .stage.fake .sno{background:var(--ink)}
+  .stage .sh{font-family:"Space Grotesk";font-weight:600;font-size:17px;color:var(--ink);margin:2px 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .stage .stech{font-family:"Space Mono",monospace;font-size:11px;color:var(--azure-deep);background:var(--azure-wash);
+    border:1px solid #cfe0f4;border-radius:5px;padding:1px 8px;letter-spacing:.01em}
+  .stage p{font-size:15px;color:#33485c;margin:.3em 0 0;line-height:1.55}
+
+  ul.clean{list-style:none;padding:0;margin:18px 0}
+  ul.clean li{position:relative;padding:7px 0 7px 26px;border-bottom:1px solid var(--line);font-size:15px;color:#2c3f52}
+  ul.clean li:last-child{border-bottom:none}
+  ul.clean li::before{content:"";position:absolute;left:4px;top:15px;width:7px;height:7px;border-radius:2px;background:var(--azure);transform:rotate(45deg)}
+
+  hr.soft{border:none;border-top:1px solid var(--line);margin:30px 0}
+
+  /* ---------- footer ---------- */
+  .docfoot{background:var(--ink);color:#9DB6CF;padding:40px 0;font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.03em}
+  .docfoot .doc{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+  .docfoot strong{color:#E7EFF7;font-weight:700}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:680px){
+    body{font-size:16px}
+    .toc{grid-template-columns:1fr}
+    .grid2{grid-template-columns:1fr}
+    .metrics{grid-template-columns:repeat(2,1fr)}
+    .cover-meta{grid-template-columns:1fr}
+    h2{font-size:25px}
+  }
+
+  /* ---------- print / PDF ---------- */
+  @media print{
+    @page{size:A4;margin:16mm 15mm}
+    body{background:#fff;font-size:10.6pt;line-height:1.5}
+    .doc{max-width:none;padding:0}
+    a{color:var(--azure-deep)}
+    .cover{min-height:auto;height:auto;page-break-after:always;
+      padding:24mm 16mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    section{page-break-before:always;padding:8mm 0 0;border-top:none}
+    section:first-of-type{page-break-before:avoid}
+    h2{font-size:20pt}
+    .callout,.card,.metric,figure,.figbox,pre,.stage,table{page-break-inside:avoid}
+    pre{font-size:8.4pt}
+    .metric::before,.callout,.chip,.stage .sno,.docfoot,.eyebrow .num,.cover{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .docfoot{page-break-before:avoid}
+  }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+</style>
+</head>
+<body>
+
+<!-- ============== COVER ============== -->
+<header class="cover">
+  <svg class="veil" viewBox="0 0 1000 1400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <radialGradient id="node" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#6FC8E8" stop-opacity=".9"/>
+        <stop offset="100%" stop-color="#6FC8E8" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <g stroke="#3D6E9C" stroke-width="1" opacity=".5">
+      <line x1="120" y1="240" x2="360" y2="430"/><line x1="360" y1="430" x2="620" y2="300"/>
+      <line x1="620" y1="300" x2="840" y2="520"/><line x1="360" y1="430" x2="300" y2="760"/>
+      <line x1="300" y1="760" x2="600" y2="900"/><line x1="600" y1="900" x2="840" y2="520"/>
+      <line x1="600" y1="900" x2="520" y2="1180"/><line x1="520" y1="1180" x2="820" y2="1080"/>
+      <line x1="300" y1="760" x2="120" y2="1040"/><line x1="120" y1="1040" x2="520" y2="1180"/>
+    </g>
+    <g fill="url(#node)">
+      <circle cx="120" cy="240" r="26"/><circle cx="360" cy="430" r="34"/><circle cx="620" cy="300" r="22"/>
+      <circle cx="840" cy="520" r="30"/><circle cx="300" cy="760" r="26"/><circle cx="600" cy="900" r="38"/>
+      <circle cx="520" cy="1180" r="24"/><circle cx="820" cy="1080" r="20"/><circle cx="120" cy="1040" r="22"/>
+    </g>
+  </svg>
+
+  <div class="cover-top">
+    <div class="brandmark">
+      <svg class="glyph" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M16 4C11 11 6 13 4 14c4 1 7 4 8 9 1-3 2.5-4.5 4-5.4 1.5.9 3 2.4 4 5.4 1-5 4-8 8-9-2-1-7-3-12-10Z" fill="#6FC8E8"/>
+      </svg>
+      <span>Thumalien</span>
+    </div>
+    <div class="cover-tag">Sup de Vinci · 2025–2026<br>Mastère 1 Big&nbsp;Data&nbsp;&&nbsp;IA<br>Projet d'études</div>
+  </div>
+
+  <div class="cover-mid">
+    <div class="cover-kicker">Documentation technique</div>
+    <h1>Détection de<br><span class="accent">fake&nbsp;news</span> sur Bluesky</h1>
+    <p class="cover-sub">Un pipeline NLP multi-étapes qui route, corrobore et juge chaque message du réseau — du flux temps réel jusqu'au verdict expliqué.</p>
+    <div class="cover-verdicts">
+      <span class="vchip"><span class="dot" style="background:var(--real)"></span>REAL · corroboré</span>
+      <span class="vchip"><span class="dot" style="background:var(--fake)"></span>FAKE · contredit</span>
+      <span class="vchip"><span class="dot" style="background:var(--unv)"></span>UNVERIFIED · sans signal</span>
+    </div>
+  </div>
+
+  <div class="cover-bottom">
+    <div class="cover-meta">
+      <div><div class="k">Client fictif</div><div class="v">Thumalien</div></div>
+      <div><div class="k">Domaine</div><div class="v">Big Data / IA · NLP</div></div>
+      <div><div class="k">Livrable</div><div class="v">Document technique final</div></div>
+      <div><div class="k">Équipe</div><div class="v">Tom Alarçon · Badr Kamal · Jeremy Jebane</div></div>
+    </div>
+    <div class="cover-repo">repo ·<br><a href="https://github.com/Draskeer/Bluesky-with-AI">github.com/Draskeer/Bluesky-with-AI</a></div>
+  </div>
+</header>
+
+<main class="doc">
+
+<!-- ============== 00 RÉSUMÉ ============== -->
+<section id="resume">
+  <div class="eyebrow"><span class="num">00</span> En bref</div>
+  <h2>Une chaîne de vérification, pas une boîte noire</h2>
+  <p class="lede"><span class="drop">T</span>humalien analyse les messages publiés sur Bluesky pour distinguer l'information vérifiable de la désinformation, mesurer leur charge émotionnelle, et rendre un verdict <em>explicable</em>. Le système ne se contente pas d'un score : il route chaque message selon son sujet, le confronte à un corpus de presse de référence tenu à jour, et n'invoque un grand modèle de langage qu'en dernier recours sur les cas ambigus.</p>
+
+  <div class="metrics">
+    <div class="metric"><div class="metric-v">9</div><div class="metric-l">services conteneurisés</div></div>
+    <div class="metric r"><div class="metric-v">4</div><div class="metric-l">modèles IA en inférence</div></div>
+    <div class="metric u"><div class="metric-v">~135</div><div class="metric-l">sources de presse indexées</div></div>
+    <div class="metric f"><div class="metric-v">3</div><div class="metric-l">verdicts possibles</div></div>
+  </div>
+
+  <div class="callout note">
+    <span class="ct">Parti pris de conception</span>
+    Chaque étape de la chaîne est un classifieur léger et spécialisé. Le LLM coûteux reste une exception, déclenchée seulement quand les signaux statistiques ne tranchent pas. Cette frugalité est un choix d'architecture autant qu'un objectif de sobriété numérique.
+  </div>
+</section>
+
+<!-- ============== SOMMAIRE ============== -->
+<section id="sommaire">
+  <div class="eyebrow"><span class="num">—</span> Sommaire</div>
+  <h2>Plan du dossier</h2>
+  <nav class="toc">
+    <a href="#contexte"><span class="tn">01</span><span class="tt">Contexte & problématique</span></a>
+    <a href="#solution"><span class="tn">02</span><span class="tt">Vue d'ensemble de la solution</span></a>
+    <a href="#archi"><span class="tn">03</span><span class="tt">Architecture système</span></a>
+    <a href="#pipeline"><span class="tn">04</span><span class="tt">Pipeline de détection</span></a>
+    <a href="#stack"><span class="tn">05</span><span class="tt">Stack & composants</span></a>
+    <a href="#data"><span class="tn">06</span><span class="tt">Modèle de données</span></a>
+    <a href="#orchestration"><span class="tn">07</span><span class="tt">Orchestration n8n</span></a>
+    <a href="#front"><span class="tn">08</span><span class="tt">Frontend & expérience</span></a>
+    <a href="#kpi"><span class="tn">09</span><span class="tt">Métriques & KPIs</span></a>
+    <a href="#green"><span class="tn">10</span><span class="tt">Sobriété numérique</span></a>
+    <a href="#orga"><span class="tn">11</span><span class="tt">Organisation & méthode</span></a>
+    <a href="#deploy"><span class="tn">12</span><span class="tt">Déploiement</span></a>
+    <a href="#limites"><span class="tn">13</span><span class="tt">Limites & perspectives</span></a>
+    <a href="#annexes"><span class="tn">14</span><span class="tt">Annexes</span></a>
+  </nav>
+</section>
+
+<!-- ============== 01 CONTEXTE ============== -->
+<section id="contexte">
+  <div class="eyebrow"><span class="num">01</span> Contexte</div>
+  <h2>Le problème que Thumalien veut résoudre</h2>
+  <p>Les réseaux sociaux sont devenus un canal majeur de circulation de l'information — et, par construction, un terrain favorable à la désinformation. Le client fictif <strong>Thumalien</strong> souhaite un outil capable d'analyser automatiquement les messages publiés sur Bluesky afin d'identifier rapidement les contenus douteux, d'évaluer leur impact émotionnel, et de fournir une aide concrète au fact-checking.</p>
+  <p>Trois constats motivent le projet : le volume de publications dépasse toute modération humaine, les fausses informations se propagent plus vite que leurs démentis, et les outils de vérification existants restent souvent limités à l'anglais et peu adaptés aux réseaux émergents. Thumalien vise donc une solution <em>multilingue</em> (français et anglais), <em>transparente</em> sur ses décisions, et attentive à son propre coût énergétique.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <span class="pill">UTILISATEURS</span>
+      <h4>Citoyens, journalistes, associations</h4>
+      <p>Une lecture immédiate de la fiabilité d'un contenu, via un badge de verdict et un score de confiance lisibles directement dans le fil.</p>
+    </div>
+    <div class="card">
+      <span class="pill">FACT-CHECKERS</span>
+      <h4>Vérificateurs professionnels</h4>
+      <p>Le détail de la classification : sources concordantes, comptage entailment / contradiction, motif du verdict — pour reprendre la main.</p>
+    </div>
+    <div class="card">
+      <span class="pill">TECHNIQUE</span>
+      <h4>Équipe data & exploitation</h4>
+      <p>Un pipeline conteneurisé, scalable et observable, où chaque modèle est isolé dans son service et remplaçable indépendamment.</p>
+    </div>
+    <div class="card">
+      <span class="pill">DIRECTION</span>
+      <h4>Commanditaire Thumalien</h4>
+      <p>Un MVP démontrable à valeur sociétale claire : montrer qu'une détection crédible et sobre est atteignable à l'échelle d'un projet étudiant.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 02 SOLUTION ============== -->
+<section id="solution">
+  <div class="eyebrow"><span class="num">02</span> Solution</div>
+  <h2>Ce que fait le système, de bout en bout</h2>
+  <p>Concrètement, Thumalien combine trois composants. Un <strong>collecteur de presse</strong> (<em>news_getter</em>) alimente en continu un corpus de référence à partir de dizaines de médias reconnus et le transforme en vecteurs sémantiques indexés dans Qdrant. Un <strong>moteur de vérification</strong> (n8n) route chaque message Bluesky soumis à l'analyse, en mesure le sentiment, le confronte au corpus par recherche sémantique, puis tranche par inférence en langage naturel. Enfin un <strong>client web</strong> restitue le tout : badge de verdict sur chaque post et tableau de bord par profil.</p>
+
+  <div class="callout">
+    <span class="ct">Idée directrice</span>
+    Un message n'est jamais jugé dans le vide. Avant de dire « vrai » ou « faux », le système cherche s'il existe une couverture journalistique du même sujet, puis évalue si cette couverture <em>soutient</em> ou <em>contredit</em> l'affirmation. Sans couverture, le verdict honnête est « non vérifiable ».
+  </div>
+
+  <h3>Le système de verdict, fil rouge du projet</h3>
+  <p>Tout le produit s'organise autour de trois états, qui servent aussi de code couleur dans l'interface comme dans cette documentation :</p>
+  <table class="tbl">
+    <thead><tr><th>Verdict</th><th>Signification</th><th>Déclencheur principal</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip real">REAL</span></td><td class="src">Information corroborée par la presse de référence</td><td class="src">Entailment NLI fort, ou corroboration multi-sources</td></tr>
+      <tr><td><span class="chip fake">FAKE</span></td><td class="src">Affirmation contredite par les sources</td><td class="src">Contradiction NLI dominante et nette</td></tr>
+      <tr><td><span class="chip unv">UNVERIFIED</span></td><td class="src">Sujet vérifiable mais sans signal probant</td><td class="src">Aucune source liée, ou signaux ambigus</td></tr>
+    </tbody>
+  </table>
+  <p>À ce verdict s'ajoutent deux dimensions transverses : la <strong>tonalité</strong> du message (positive, neutre, négative) et sa <strong>portée</strong> (information publique vérifiable, ou message personnel hors champ de vérification).</p>
+</section>
+
+<!-- ============== 03 ARCHITECTURE ============== -->
+<section id="archi">
+  <div class="eyebrow"><span class="num">03</span> Architecture</div>
+  <h2>La carte des services</h2>
+  <p>L'ensemble tourne sous Docker Compose, organisé en couches : présentation, application, orchestration, services d'inférence, stockage, et ingestion. Chaque modèle d'IA vit dans son propre conteneur, exposé par une petite API : le moteur orchestrateur (n8n) ne fait qu'enchaîner des appels HTTP, ce qui rend chaque brique testable et remplaçable seule.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 760 540" width="100%" role="img" aria-label="Schéma d'architecture des services">
+        <defs>
+          <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#5C7187"/>
+          </marker>
+          <marker id="arrA" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#1B6CC9"/>
+          </marker>
+        </defs>
+
+        <!-- lane labels -->
+        <g class="svgmono" font-size="9.5" fill="#8497A9" letter-spacing="1">
+          <text x="14" y="42">PRÉSENTATION</text>
+          <text x="14" y="132">APPLICATION</text>
+          <text x="14" y="222">ORCHESTRATION</text>
+          <text x="14" y="330">SERVICES D'INFÉRENCE</text>
+          <text x="14" y="470">STOCKAGE & INGESTION</text>
+        </g>
+        <g stroke="#E3EBF2" stroke-width="1">
+          <line x1="14" y1="52" x2="746" y2="52"/>
+          <line x1="14" y1="142" x2="746" y2="142"/>
+          <line x1="14" y1="232" x2="746" y2="232"/>
+          <line x1="14" y1="408" x2="746" y2="408"/>
+        </g>
+
+        <!-- nodes helper styles -->
+        <g class="svgtxt" font-size="12.5" font-weight="600">
+          <!-- frontend -->
+          <rect x="300" y="62" width="160" height="46" rx="9" fill="#E8F0FA" stroke="#9FC2E8"/>
+          <text x="380" y="82" text-anchor="middle" fill="#123F7C">Client React</text>
+          <text x="380" y="98" text-anchor="middle" class="svgmono" font-size="9" font-weight="400" fill="#5C7187">Vite · :5173</text>
+
+          <!-- backend -->
+          <rect x="300" y="152" width="160" height="46" rx="9" fill="#fff" stroke="#C2D0DD"/>
+          <text x="380" y="172" text-anchor="middle" fill="#16263A">API Express</text>
+          <text x="380" y="188" text-anchor="middle" class="svgmono" font-size="9" font-weight="400" fill="#5C7187">Node/TS · :3001</text>
+
+          <!-- n8n -->
+          <rect x="300" y="242" width="160" height="46" rx="9" fill="#0B1B2B" stroke="#0B1B2B"/>
+          <text x="380" y="262" text-anchor="middle" fill="#fff">Orchestrateur n8n</text>
+          <text x="380" y="278" text-anchor="middle" class="svgmono" font-size="9" font-weight="400" fill="#9DB6CF">workflow · :5678</text>
+
+          <!-- inference row -->
+          <rect x="40" y="300" width="150" height="86" rx="9" fill="#fff" stroke="#C2D0DD"/>
+          <text x="115" y="324" text-anchor="middle" fill="#16263A" font-size="12">Classifier</text>
+          <text x="115" y="342" text-anchor="middle" class="svgmono" font-size="8.5" font-weight="400" fill="#5C7187">BERT · :8002</text>
+          <text x="115" y="358" text-anchor="middle" class="svgmono" font-size="8" font-weight="400" fill="#8497A9">topic · sentiment</text>
+          <text x="115" y="370" text-anchor="middle" class="svgmono" font-size="8" font-weight="400" fill="#8497A9">verify (NLI)</text>
+
+          <rect x="210" y="300" width="150" height="86" rx="9" fill="#fff" stroke="#C2D0DD"/>
+          <text x="285" y="324" text-anchor="middle" fill="#16263A" font-size="12">News Getter</text>
+          <text x="285" y="342" text-anchor="middle" class="svgmono" font-size="8.5" font-weight="400" fill="#5C7187">embed · :8001</text>
+          <text x="285" y="360" text-anchor="middle" class="svgmono" font-size="8" font-weight="400" fill="#8497A9">RSS · NewsAPI</text>
+
+          <rect x="400" y="300" width="150" height="86" rx="9" fill="#fff" stroke="#C2D0DD"/>
+          <text x="475" y="324" text-anchor="middle" fill="#16263A" font-size="12">LLM Server</text>
+          <text x="475" y="342" text-anchor="middle" class="svgmono" font-size="8.5" font-weight="400" fill="#5C7187">Qwen2.5 · :8000</text>
+          <text x="475" y="360" text-anchor="middle" class="svgmono" font-size="8" font-weight="400" fill="#8497A9">escalade</text>
+
+          <rect x="570" y="300" width="150" height="86" rx="9" fill="#E2F4EF" stroke="#9AD3C4"/>
+          <text x="645" y="324" text-anchor="middle" fill="#0a7a66" font-size="12">Qdrant</text>
+          <text x="645" y="342" text-anchor="middle" class="svgmono" font-size="8.5" font-weight="400" fill="#0a7a66">vecteurs · :6333</text>
+          <text x="645" y="360" text-anchor="middle" class="svgmono" font-size="8" font-weight="400" fill="#5C9c8f">news · fakes</text>
+
+          <!-- storage row -->
+          <rect x="40" y="418" width="150" height="74" rx="9" fill="#fff" stroke="#C2D0DD"/>
+          <text x="115" y="442" text-anchor="middle" fill="#16263A" font-size="12">PostgreSQL</text>
+          <text x="115" y="460" text-anchor="middle" class="svgmono" font-size="8.5" font-weight="400" fill="#5C7187">bluesky_ai · :5432</text>
+          <text x="115" y="475" text-anchor="middle" class="svgmono" font-size="8" font-weight="400" fill="#8497A9">verdicts, users</text>
+
+          <rect x="210" y="418" width="150" height="74" rx="9" fill="#fff" stroke="#C2D0DD"/>
+          <text x="285" y="442" text-anchor="middle" fill="#16263A" font-size="12">TimescaleDB</text>
+          <text x="285" y="460" text-anchor="middle" class="svgmono" font-size="8.5" font-weight="400" fill="#5C7187">bluesky_data · :5433</text>
+          <text x="285" y="475" text-anchor="middle" class="svgmono" font-size="8" font-weight="400" fill="#8497A9">hypertable posts</text>
+
+
+          <rect x="570" y="418" width="150" height="74" rx="9" fill="#fff" stroke="#C2D0DD"/>
+          <text x="645" y="448" text-anchor="middle" fill="#16263A" font-size="12">pgAdmin</text>
+          <text x="645" y="466" text-anchor="middle" class="svgmono" font-size="8.5" font-weight="400" fill="#5C7187">admin · :5050</text>
+        </g>
+
+        <!-- connections -->
+        <g fill="none">
+          <path d="M380,108 L380,152" stroke="#1B6CC9" stroke-width="1.6" marker-end="url(#arrA)"/>
+          <path d="M380,198 L380,242" stroke="#1B6CC9" stroke-width="1.6" marker-end="url(#arrA)"/>
+          <path d="M340,288 C250,300 160,290 130,300" stroke="#5C7187" stroke-width="1.2" marker-end="url(#arr)"/>
+          <path d="M360,288 C320,296 300,296 290,300" stroke="#5C7187" stroke-width="1.2" marker-end="url(#arr)"/>
+          <path d="M420,288 C450,296 465,296 472,300" stroke="#5C7187" stroke-width="1.2" marker-end="url(#arr)"/>
+          <path d="M440,285 C560,296 620,290 640,300" stroke="#5C7187" stroke-width="1.2" marker-end="url(#arr)"/>
+          <path d="M285,386 L285,418" stroke="#5C7187" stroke-width="1.2" marker-end="url(#arr)"/>
+          <path d="M645,386 L645,408" stroke="#0E9E83" stroke-width="1.2"/>
+          <path d="M460,255 C540,250 690,300 660,418" stroke="#5C7187" stroke-width="1.1" stroke-dasharray="3 3" marker-end="url(#arr)"/>
+        </g>
+      </svg>
+    </div>
+    <figcaption><span class="fno">Fig. 1</span> Topologie Docker — le client appelle l'API, qui délègue l'analyse profonde à n8n ; n8n orchestre les services d'inférence ; les verdicts atterrissent en base.</figcaption>
+  </figure>
+
+  <h3>Trois magasins, trois rôles</h3>
+  <p>Le projet sépare délibérément <strong>le corpus de référence</strong>, <strong>les posts analysés</strong> et <strong>les verdicts</strong>. Le service <em>news_getter</em> collecte et vectorise les articles de presse, qu'il indexe dans <strong>Qdrant</strong> sans toucher à la base applicative. Les posts Bluesky soumis à l'analyse peuvent être tracés dans une <em>hypertable</em> TimescaleDB optimisée pour les requêtes temporelles. Les résultats d'analyse, eux, vivent dans une base PostgreSQL légère que le frontend interroge.</p>
+</section>
+
+<!-- ============== 04 PIPELINE ============== -->
+<section id="pipeline">
+  <div class="eyebrow"><span class="num">04</span> Pipeline</div>
+  <h2>Le chemin d'un message jusqu'au verdict</h2>
+  <p>C'est le cœur du projet. Quand l'analyse d'un post est demandée, l'API transmet à n8n un objet minimal — <code>message</code>, <code>user</code>, <code>msg_id</code> — et le workflow déroule une séquence de portes et de tests. La logique est volontairement <em>en cascade</em> : on dépense le calcul coûteux seulement quand les filtres rapides n'ont pas suffi.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 760 360" width="100%" role="img" aria-label="Pipeline de vérification">
+        <defs>
+          <marker id="pa" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1B6CC9"/></marker>
+          <marker id="pg" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#8497A9"/></marker>
+        </defs>
+
+        <!-- entry -->
+        <g class="svgtxt">
+          <rect x="20" y="150" width="92" height="54" rx="10" fill="#0B1B2B"/>
+          <text x="66" y="174" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Message</text>
+          <text x="66" y="190" text-anchor="middle" class="svgmono" font-size="8" fill="#9DB6CF">webhook</text>
+        </g>
+
+        <!-- topic gate -->
+        <g class="svgtxt">
+          <rect x="150" y="150" width="100" height="54" rx="10" fill="#E8F0FA" stroke="#1B6CC9"/>
+          <text x="200" y="172" text-anchor="middle" fill="#123F7C" font-size="12" font-weight="600">Routage</text>
+          <text x="200" y="188" text-anchor="middle" class="svgmono" font-size="8" fill="#5C7187">topic · BERT</text>
+        </g>
+
+        <!-- branch up: personal -->
+        <g class="svgtxt">
+          <rect x="290" y="34" width="118" height="48" rx="10" fill="#fff" stroke="#C2D0DD"/>
+          <text x="349" y="55" text-anchor="middle" fill="#16263A" font-size="11.5" font-weight="600">Sentiment seul</text>
+          <text x="349" y="71" text-anchor="middle" class="svgmono" font-size="8" fill="#8497A9">message personnel</text>
+        </g>
+
+        <!-- main chain -->
+        <g class="svgtxt">
+          <rect x="290" y="150" width="92" height="54" rx="10" fill="#fff" stroke="#C2D0DD"/>
+          <text x="336" y="172" text-anchor="middle" fill="#16263A" font-size="11.5" font-weight="600">Embedding</text>
+          <text x="336" y="188" text-anchor="middle" class="svgmono" font-size="8" fill="#8497A9">384-d</text>
+
+          <rect x="406" y="150" width="92" height="54" rx="10" fill="#E2F4EF" stroke="#0E9E83"/>
+          <text x="452" y="172" text-anchor="middle" fill="#0a7a66" font-size="11.5" font-weight="600">RAG</text>
+          <text x="452" y="188" text-anchor="middle" class="svgmono" font-size="8" fill="#5C9c8f">Qdrant search</text>
+
+          <rect x="522" y="150" width="92" height="54" rx="10" fill="#fff" stroke="#C2D0DD"/>
+          <text x="568" y="172" text-anchor="middle" fill="#16263A" font-size="11.5" font-weight="600">NLI</text>
+          <text x="568" y="188" text-anchor="middle" class="svgmono" font-size="8" fill="#8497A9">verify</text>
+
+          <!-- llm escalation -->
+          <rect x="522" y="252" width="92" height="48" rx="10" fill="#0B1B2B"/>
+          <text x="568" y="272" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">LLM</text>
+          <text x="568" y="288" text-anchor="middle" class="svgmono" font-size="7.5" fill="#9DB6CF">si ambigu</text>
+        </g>
+
+        <!-- verdict -->
+        <g class="svgtxt">
+          <rect x="648" y="146" width="92" height="62" rx="10" fill="#fff" stroke="#1B6CC9" stroke-width="1.5"/>
+          <circle cx="667" cy="166" r="4" fill="#0E9E83"/><circle cx="667" cy="178" r="4" fill="#E0533D"/><circle cx="667" cy="190" r="4" fill="#C98A12"/>
+          <text x="700" y="170" text-anchor="middle" fill="#16263A" font-size="11.5" font-weight="600">Verdict</text>
+          <text x="700" y="186" text-anchor="middle" class="svgmono" font-size="7.5" fill="#8497A9">+ insert</text>
+        </g>
+
+        <!-- arrows -->
+        <g fill="none" stroke-width="1.6">
+          <path d="M112,177 L150,177" stroke="#1B6CC9" marker-end="url(#pa)"/>
+          <path d="M250,165 C272,150 270,90 290,72" stroke="#8497A9" stroke-width="1.3" marker-end="url(#pg)"/>
+          <path d="M250,189 C272,200 270,188 290,180" stroke="#1B6CC9" marker-end="url(#pa)"/>
+          <path d="M382,177 L406,177" stroke="#1B6CC9" marker-end="url(#pa)"/>
+          <path d="M498,177 L522,177" stroke="#1B6CC9" marker-end="url(#pa)"/>
+          <path d="M614,177 L648,177" stroke="#1B6CC9" marker-end="url(#pa)"/>
+          <path d="M568,204 L568,252" stroke="#8497A9" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#pg)"/>
+          <path d="M614,276 C660,276 680,230 700,208" stroke="#8497A9" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#pg)"/>
+          <path d="M408,58 C520,58 640,120 700,146" stroke="#8497A9" stroke-width="1.3" marker-end="url(#pg)"/>
+        </g>
+        <text x="262" y="118" class="svgmono" font-size="8.5" fill="#8497A9" transform="rotate(-42 262 118)">non vérifiable</text>
+        <text x="258" y="206" class="svgmono" font-size="8.5" fill="#1B6CC9">vérifiable</text>
+      </svg>
+    </div>
+    <figcaption><span class="fno">Fig. 2</span> La porte de routage sépare les messages personnels (sentiment seul) des affirmations vérifiables, qui suivent la chaîne RAG → NLI → escalade LLM.</figcaption>
+  </figure>
+
+  <div class="stage gate">
+    <div class="sno">01</div>
+    <div>
+      <div class="sh">Routage thématique <span class="stech">tweet-topic-21-multi</span></div>
+      <p>Premier filtre : le message parle-t-il d'un sujet <em>factuel et public</em> (actualité, science, sport, économie, santé) ou d'une expérience personnelle&nbsp;? Un classifieur de sujets entraîné sur de vrais tweets répond ; en cas de faible confiance, un repli en <em>zero-shot</em> NLI reclasse avec des étiquettes françaises. Un garde-fou par expression régulière écarte enfin les opinions explicites à la première personne (« je pense que… », « selon moi… ») même quand le sujet semble vérifiable. Verdict de la porte : <code>checkable = true / false</code>.</p>
+    </div>
+  </div>
+  <div class="stage">
+    <div class="sno">02</div>
+    <div>
+      <div class="sh">Analyse de sentiment <span class="stech">twitter-xlm-roberta</span></div>
+      <p>En parallèle, un modèle multilingue attribue une tonalité au message : <span class="chip real">positive</span> <span class="chip">neutral</span> <span class="chip fake">negative</span>. Cette dimension émotionnelle accompagne tous les messages, vérifiables ou non, et nourrit ensuite les graphiques du tableau de bord.</p>
+    </div>
+  </div>
+  <div class="stage">
+    <div class="sno">03</div>
+    <div>
+      <div class="sh">Vectorisation & recherche RAG <span class="stech">MiniLM-L12 · Qdrant</span></div>
+      <p>Si le message est vérifiable, il est encodé dans un espace vectoriel à 384 dimensions — le <em>même</em> que celui des articles de presse indexés, condition d'une recherche cohérente. Deux collections Qdrant sont interrogées : <code>news_articles</code> (la presse de référence) et <code>fake_reports</code> (les signalements communautaires). On en tire les sources les plus proches sémantiquement de l'affirmation.</p>
+    </div>
+  </div>
+  <div class="stage">
+    <div class="sno">04</div>
+    <div>
+      <div class="sh">Vérification par inférence (NLI) <span class="stech">mDeBERTa-v3 xnli</span></div>
+      <p>Pour chaque source retenue, un modèle d'inférence en langage naturel mesure la relation entre l'article et l'affirmation : <em>entailment</em> (soutien), <em>contradiction</em> ou <em>neutre</em>. Le service agrège ces signaux selon des seuils ajustés pour limiter les faux positifs : il faut une contradiction nette et dominante pour conclure <span class="chip fake">FAKE</span>, un soutien fort ou une corroboration multi-sources pour <span class="chip real">REAL</span>, et à défaut le verdict reste <span class="chip unv">UNVERIFIED</span>.</p>
+    </div>
+  </div>
+  <div class="stage fake">
+    <div class="sno">05</div>
+    <div>
+      <div class="sh">Escalade LLM <span class="stech">Qwen2.5-0.5B-Instruct</span></div>
+      <p>Uniquement quand les signaux statistiques restent ambigus — et si l'escalade est activée — un petit LLM instruction-tuné est appelé en dernier recours. Il reçoit un prompt système strict et répond en JSON déterministe (génération greedy) avec un jugement de fake news et la tonalité. C'est l'exception, pas la règle : le coût de calcul est réservé aux cas qui le justifient.</p>
+    </div>
+  </div>
+  <div class="stage real">
+    <div class="sno">06</div>
+    <div>
+      <div class="sh">Verdict, persistance & signalement</div>
+      <p>Le résultat consolidé — verdict, confiance, tonalité, source de preuve — est inséré dans la table <code>messages</code>. Le frontend, qui interrogeait l'état en arrière-plan, bascule alors le badge du post. En parallèle, tout utilisateur peut <em>signaler</em> un contenu : le signalement est vectorisé et versé dans la collection <code>fake_reports</code>, qui réenrichit la recherche RAG des analyses suivantes — une boucle communautaire.</p>
+    </div>
+  </div>
+
+  <div class="callout note">
+    <span class="ct">Pourquoi cette cascade</span>
+    Router avant de vérifier épargne tout le calcul RAG/NLI sur les messages personnels. Vérifier avant d'invoquer le LLM épargne le modèle génératif sur la grande majorité des cas. Chaque porte est un filtre qui réduit le travail confié à l'étape suivante, plus lourde.
+  </div>
+</section>
+
+<!-- ============== 05 STACK ============== -->
+<section id="stack">
+  <div class="eyebrow"><span class="num">05</span> Stack</div>
+  <h2>Composants & technologies</h2>
+  <p>Le système est polyglotte par nécessité : TypeScript pour l'application web, Python pour l'inférence IA, et n8n pour la colle. Voici l'inventaire des services et des modèles réellement déployés.</p>
+
+  <h3>Services & ports</h3>
+  <table class="tbl">
+    <thead><tr><th>Service</th><th>Rôle</th><th>Techno</th><th>Port</th></tr></thead>
+    <tbody>
+      <tr><td><strong>frontend</strong></td><td class="src">Client Bluesky + badges & dashboard</td><td class="src">React 18, Vite, Tailwind, Zustand</td><td><span class="chip">5173</span></td></tr>
+      <tr><td><strong>backend</strong></td><td class="src">API REST, proxy AT Protocol, déclenche n8n</td><td class="src">Node, Express, TypeScript, Zod</td><td><span class="chip">3001</span></td></tr>
+      <tr><td><strong>n8n</strong></td><td class="src">Orchestration du workflow d'analyse</td><td class="src">n8n</td><td><span class="chip">5678</span></td></tr>
+      <tr><td><strong>classifier</strong></td><td class="src">Topic, sentiment, vérification NLI</td><td class="src">FastAPI, Transformers (CPU)</td><td><span class="chip">8002</span></td></tr>
+      <tr><td><strong>news_getter</strong></td><td class="src">Collecte presse + API d'embedding</td><td class="src">FastAPI, fastembed (ONNX)</td><td><span class="chip">8001</span></td></tr>
+      <tr><td><strong>llm-server</strong></td><td class="src">LLM d'escalade (compatible OpenAI)</td><td class="src">FastAPI, Qwen2.5</td><td><span class="chip">8000</span></td></tr>
+      <tr><td><strong>qdrant</strong></td><td class="src">Base vectorielle (news + fakes)</td><td class="src">Qdrant</td><td><span class="chip">6333</span></td></tr>
+      <tr><td><strong>postgres</strong></td><td class="src">Verdicts, users, données n8n</td><td class="src">PostgreSQL 16</td><td><span class="chip">5432</span></td></tr>
+      <tr><td><strong>postgres-data</strong></td><td class="src">Posts ingérés (séries temporelles)</td><td class="src">TimescaleDB / PG 16</td><td><span class="chip">5433</span></td></tr>
+      <tr><td><strong>pgadmin</strong></td><td class="src">Administration des bases</td><td class="src">pgAdmin 4</td><td><span class="chip">5050</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Modèles d'IA en inférence</h3>
+  <table class="tbl">
+    <thead><tr><th>Tâche</th><th>Modèle</th><th>Sortie</th></tr></thead>
+    <tbody>
+      <tr><td class="src">Sentiment</td><td><span class="mono">twitter-xlm-roberta-base-sentiment</span></td><td class="src">positive / neutral / negative</td></tr>
+      <tr><td class="src">Routage thématique</td><td><span class="mono">tweet-topic-21-multi</span> <span class="src">(+ zero-shot NLI)</span></td><td class="src">checkable + sujet</td></tr>
+      <tr><td class="src">Vérification (NLI)</td><td><span class="mono">mDeBERTa-v3-base-xnli-2mil7</span></td><td class="src">entailment / contradiction</td></tr>
+      <tr><td class="src">Embeddings RAG</td><td><span class="mono">paraphrase-multilingual-MiniLM-L12-v2</span></td><td class="src">vecteur 384-d</td></tr>
+      <tr><td class="src">Escalade générative</td><td><span class="mono">Qwen2.5-0.5B-Instruct</span></td><td class="src">JSON jugement + mood</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <span class="ct">Multilingue par défaut</span>
+    Tous les modèles retenus sont multilingues (FR + EN), répondant à l'exigence du cahier des charges. Les embeddings « paraphrase » sont symétriques : le même encodage s'applique aux articles indexés et au message requête, sans préfixe, ce qui garantit une comparaison sémantique correcte entre les deux.
+  </div>
+</section>
+
+<!-- ============== 06 DATA ============== -->
+<section id="data">
+  <div class="eyebrow"><span class="num">06</span> Données</div>
+  <h2>Modèle de données</h2>
+  <p>Trois magasins coexistent : une base relationnelle pour les verdicts, une base temporelle pour l'ingestion, et une base vectorielle pour la recherche sémantique.</p>
+
+  <h3>PostgreSQL — verdicts & confiance</h3>
+  <p>La table <code>messages</code> est la mémoire des analyses. À partir d'elle, le backend calcule un <strong>score de confiance par profil</strong> (« trust score ») : la part d'informations jugées fiables, pondérée par la confiance moyenne des verdicts.</p>
+  <pre><code><span class="c">-- bluesky_ai · table des verdicts</span>
+<span class="k">CREATE TABLE</span> messages (
+  message_id  <span class="k">VARCHAR</span>(255) <span class="k">UNIQUE</span>,   <span class="c">-- URI at:// du post</span>
+  is_fake     <span class="k">BOOLEAN</span> <span class="k">DEFAULT</span> false,
+  confidence  <span class="k">FLOAT</span>   <span class="k">DEFAULT</span> 0,
+  verdict     <span class="k">VARCHAR</span>(20) <span class="k">DEFAULT</span> <span class="s">'unverified'</span>,
+  mood        <span class="k">VARCHAR</span>(32),            <span class="c">-- positive | neutral | negative</span>
+  created_at  <span class="k">TIMESTAMPTZ</span> <span class="k">DEFAULT</span> now()
+);
+
+<span class="c">-- trust = (1 - taux_fake) * confiance_moyenne, sur les messages vérifiés</span></code></pre>
+
+  <h3>TimescaleDB — traçabilité des posts</h3>
+  <p>Les posts Bluesky soumis à l'analyse via le webhook n8n sont tracés dans une <em>hypertable</em> partitionnée par le temps. Ce choix permet d'interroger très vite « tous les posts d'une fenêtre horaire » sans surcharger la base de verdicts.</p>
+  <pre><code><span class="c">-- bluesky_data · pointeurs de posts (hypertable)</span>
+<span class="k">CREATE TABLE</span> raw_post_pointers (
+  created_at  <span class="k">TIMESTAMPTZ</span> <span class="k">NOT NULL</span>,
+  message_id  <span class="k">VARCHAR</span>(255) <span class="k">NOT NULL</span>,
+  <span class="k">PRIMARY KEY</span> (message_id, created_at)
+);
+<span class="k">SELECT</span> create_hypertable(<span class="s">'raw_post_pointers'</span>, <span class="s">'created_at'</span>);</code></pre>
+
+  <h3>Qdrant — espace vectoriel</h3>
+  <table class="tbl">
+    <thead><tr><th>Collection</th><th>Contenu</th><th>Dim.</th><th>Distance</th></tr></thead>
+    <tbody>
+      <tr><td><span class="mono">news_articles</span></td><td class="src">Corpus de presse de référence</td><td class="src">384</td><td class="src">Cosine</td></tr>
+      <tr><td><span class="mono">fake_reports</span></td><td class="src">Signalements communautaires</td><td class="src">384</td><td class="src">Cosine</td></tr>
+    </tbody>
+  </table>
+  <p>Les articles portent une charge utile indexée (source, catégorie, date de publication) permettant de filtrer la recherche. La <strong>déduplication</strong> repose sur un UUID déterministe dérivé de l'URL : relancer le collecteur n'insère jamais de doublon, même si le même article apparaît dans plusieurs flux.</p>
+
+  <h3>Sources du corpus de référence</h3>
+  <p>Le collecteur agrège trois familles de sources et rafraîchit l'index périodiquement (toutes les ~150 minutes par défaut) : les flux RSS publics de la <strong>BBC</strong> (monde, tech, science, économie…), environ <strong>135 flux RSS</strong> de médias reconnus couvrant l'anglophone (Reuters, AP, The Guardian, NYT, CNN, NPR, The Economist…) et le francophone (Le Monde, BFMTV, RFI, Radio-Canada, Le Temps, Jeune Afrique…) sur plus de 20 pays, et <strong>NewsAPI</strong> (plafonné pour rester sous la limite gratuite). Chaque article est embarqué par lots pour maîtriser la mémoire.</p>
+</section>
+
+<!-- ============== 07 ORCHESTRATION ============== -->
+<section id="orchestration">
+  <div class="eyebrow"><span class="num">07</span> Orchestration</div>
+  <h2>Le workflow n8n</h2>
+  <p>Plutôt que de coder la chaîne en dur, le projet l'exprime comme un <strong>workflow n8n</strong> de plus d'une vingtaine de nœuds. Chaque appel de modèle est un nœud HTTP, chaque décision un nœud conditionnel, chaque branche se termine par une écriture en base. Avantage : la logique de vérification se lit, se modifie et se rejoue visuellement, sans redéploiement applicatif.</p>
+
+  <ul class="clean">
+    <li><strong>Webhook</strong> — réception de <code>{ message, user, msg_id }</code> depuis le backend.</li>
+    <li><strong>Topic (BERT) → Is Checkable?</strong> — porte de routage vers la branche personnelle ou vérifiable.</li>
+    <li><strong>Sentiment (BERT)</strong> — tonalité du message, sur les deux branches.</li>
+    <li><strong>Embed → Qdrant Search (×2) → Build Articles</strong> — vectorisation et récupération des sources candidates (news + fakes).</li>
+    <li><strong>Verify (NLI) → LLM Decision → Needs LLM?</strong> — agrégation des signaux puis décision d'escalade.</li>
+    <li><strong>FakeNews (Qwen) → Parse</strong> — appel du LLM seulement sur les cas ambigus.</li>
+    <li><strong>Insert Message (Postgres)</strong> + <strong>Infos / Errors Logger</strong> — persistance du verdict et journalisation.</li>
+  </ul>
+
+  <p>Un second workflow, <em>Report Fake Indexer</em>, gère la boucle communautaire : il reçoit un signalement, le vectorise et l'insère dans la collection <code>fake_reports</code>. Le tout est provisionné automatiquement au démarrage (création du compte, import des workflows, credentials), ce qui rend l'environnement reproductible.</p>
+
+  <div class="callout">
+    <span class="ct">Robustesse côté backend</span>
+    L'API suit les analyses « en vol » avec un délai d'expiration : si n8n ne répond pas dans la fenêtre impartie (jusqu'à deux minutes pour couvrir l'escalade LLM), l'identifiant est purgé et l'analyse pourra être relancée. Le frontend, lui, interroge l'état toutes les 3 secondes et propose un bouton « Relancer » en cas d'échec.
+  </div>
+</section>
+
+<!-- ============== 08 FRONT ============== -->
+<section id="front">
+  <div class="eyebrow"><span class="num">08</span> Frontend</div>
+  <h2>Restituer le verdict, pas le masquer</h2>
+  <p>Le client web est un véritable client Bluesky — fil, exploration, profils, fils personnalisés, listes, notifications — bâti sur l'AT Protocol via un <em>App Password</em>. Sa valeur ajoutée est l'analyse, intégrée au plus près du contenu.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <span class="pill">AU NIVEAU DU POST</span>
+      <h4>Badge de verdict à la demande</h4>
+      <p>Chaque carte de message vérifie en lecture seule si une analyse existe déjà. Sinon, un bouton « Analyser » déclenche le pipeline, puis le badge se met à jour. Lancer toutes les analyses d'un coup au chargement serait trop lourd : le déclenchement est donc manuel et ciblé.</p>
+    </div>
+    <div class="card">
+      <span class="pill">AU NIVEAU DU PROFIL</span>
+      <h4>Tableau de bord IA</h4>
+      <p>Par utilisateur : score de confiance, répartition des tonalités, et évolution temporelle des verdicts fake / real et du sentiment, sur une fenêtre semaine / mois / année.</p>
+    </div>
+    <div class="card">
+      <span class="pill">PARTICIPATION</span>
+      <h4>Signalement communautaire</h4>
+      <p>Un contenu jugé trompeur peut être signalé ; le signalement enrichit la base vectorielle des « fakes » et influence les analyses suivantes.</p>
+    </div>
+    <div class="card">
+      <span class="pill">EXPÉRIENCE</span>
+      <h4>Interface moderne</h4>
+      <p>Thème sombre dans l'esprit Bluesky, responsive mobile et desktop, navigation par routeur, état applicatif géré par un store léger.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 09 KPI ============== -->
+<section id="kpi">
+  <div class="eyebrow"><span class="num">09</span> Évaluation</div>
+  <h2>Métriques & KPIs</h2>
+  <p>La performance se mesure sur deux plans : la qualité de classification (le système se trompe-t-il&nbsp;?) et l'exploitation (le système est-il utilisable et sobre&nbsp;?).</p>
+
+  <div class="metrics">
+    <div class="metric r"><div class="metric-v">F1</div><div class="metric-l">qualité fake / real</div></div>
+    <div class="metric f"><div class="metric-v">FP / FN</div><div class="metric-l">taux d'erreurs</div></div>
+    <div class="metric u"><div class="metric-v">t&nbsp;moyen</div><div class="metric-l">latence d'analyse</div></div>
+    <div class="metric"><div class="metric-v">kWh</div><div class="metric-l">coût énergétique</div></div>
+  </div>
+
+  <h3>Des seuils pensés contre les faux positifs</h3>
+  <p>Le service de vérification est paramétré pour <em>préférer le doute à l'erreur</em>. Plutôt que de trancher trop vite, il exige des preuves convergentes :</p>
+  <table class="tbl">
+    <thead><tr><th>Paramètre</th><th>Sens</th><th>Effet</th></tr></thead>
+    <tbody>
+      <tr><td><span class="mono">ENTAIL_SOFT = 0.65</span></td><td class="src">Seuil pour qu'un article « soutienne » l'affirmation</td><td class="src">Évite les soutiens partiels trompeurs</td></tr>
+      <tr><td><span class="mono">NLI_HI = 0.75</span></td><td class="src">Seuil pour trancher fake / real</td><td class="src">Décision seulement si signal fort</td></tr>
+      <tr><td><span class="mono">CORRO_MIN = 4</span></td><td class="src">Sources concordantes pour conclure « real »</td><td class="src">Exige une corroboration multiple</td></tr>
+      <tr><td><span class="mono">FAKE_MARGIN = 0.15</span></td><td class="src">Avance requise de la contradiction</td><td class="src">Bloque les « fake » de justesse</td></tr>
+    </tbody>
+  </table>
+  <p>Le verdict <span class="chip unv">UNVERIFIED</span> n'est pas un échec : c'est une réponse honnête quand les données ne permettent pas de conclure. Privilégier la prudence est une décision produit assumée pour un outil d'aide au fact-checking.</p>
+</section>
+
+<!-- ============== 10 GREEN ============== -->
+<section id="green">
+  <div class="eyebrow"><span class="num">10</span> Sobriété</div>
+  <h2>Green IT : la frugalité comme contrainte de design</h2>
+  <p>Le suivi énergétique est un axe explicite du cahier des charges. Au-delà de la mesure, c'est l'architecture elle-même qui a été pensée sobre — plusieurs décisions techniques le montrent directement dans le code.</p>
+
+  <ul class="clean">
+    <li><strong>Inférence CPU uniquement.</strong> Aucun GPU requis : les modèles retenus sont assez légers pour tourner sur processeur, dans l'enveloppe mémoire d'un poste étudiant.</li>
+    <li><strong>Petits modèles spécialisés.</strong> Un LLM de 0,5&nbsp;milliard de paramètres, des classifieurs BERT distillés, des embeddings MiniLM — pas de modèle géant là où un modèle ciblé suffit.</li>
+    <li><strong>Embeddings ONNX sans PyTorch.</strong> Le collecteur de presse encode via <span class="mono">fastembed</span> ; un modèle plus lourd (e5-large, 2,2&nbsp;Go) faisait saturer la mémoire et a été écarté au profit d'un MiniLM ~0,2&nbsp;Go.</li>
+    <li><strong>LLM en dernier recours.</strong> Le modèle génératif, le plus coûteux, n'est appelé que sur les cas ambigus — l'immense majorité des messages ne le sollicite jamais.</li>
+    <li><strong>Déduplication & lots.</strong> Les articles déjà indexés ne sont jamais ré-encodés ; l'embedding se fait par lots pour lisser la charge.</li>
+  </ul>
+
+  <div class="callout note">
+    <span class="ct">À instrumenter</span>
+    La mesure fine de la consommation (type CodeCarbon / MLCO2) est l'extension naturelle de ces choix : exposer en kWh / gCO₂e le coût réel de chaque cycle d'analyse, et le faire apparaître comme un KPI à part entière. L'architecture frugale en place rend cette mesure d'autant plus parlante.
+  </div>
+</section>
+
+<!-- ============== 11 ORGA ============== -->
+<section id="orga">
+  <div class="eyebrow"><span class="num">11</span> Organisation</div>
+  <h2>Équipe, rôles & méthode</h2>
+  <p>Le projet se répartit sur trois pôles — ingénierie de données, science des données, dev & analyse — avec une contribution partagée à la sobriété numérique.</p>
+
+  <table class="tbl">
+    <thead><tr><th>Rôle</th><th>Responsable</th><th>Périmètre</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Data Engineer</strong></td><td class="src">Badr Kamal</td><td class="src">Ingestion, bases, API, conteneurs</td></tr>
+      <tr><td><strong>Data Scientist</strong></td><td class="src">Tom Alarçon</td><td class="src">NLP, classification, seuils NLI, RAG</td></tr>
+      <tr><td><strong>Dev & Data Analyste</strong></td><td class="src">Jeremy Jebane</td><td class="src">Sentiment, explicabilité, dashboard, frontend</td></tr>
+      <tr><td><strong>Green IT</strong></td><td class="src">Tom Alarçon · Badr Kamal · Jeremy Jebane</td><td class="src">Sobriété numérique, suivi énergétique</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Méthodologie</h3>
+  <p>Le développement suit une approche itérative et incrémentale : chaque service constitue un livrable testable indépendamment, intégré progressivement au pipeline. Le versionnage Git, la conteneurisation systématique et le provisionnement automatique de n8n garantissent un environnement reproductible — un développeur clone, lance Docker Compose, et obtient le système complet. Les bonnes pratiques visées par le cahier des charges (versionner, documenter le pipeline, tests unitaires) structurent le travail au quotidien.</p>
+</section>
+
+<!-- ============== 12 DEPLOY ============== -->
+<section id="deploy">
+  <div class="eyebrow"><span class="num">12</span> Déploiement</div>
+  <h2>Mise en route</h2>
+  <p>L'environnement se lance en deux temps : la pile de services IA / données via Docker Compose, puis l'application web (backend + frontend) en local.</p>
+
+  <h4>1 · Pile de services (Docker)</h4>
+  <pre><code><span class="c"># depuis docker_services/ — copier puis renseigner les variables</span>
+cp .env.exemple .env
+docker compose up -d
+<span class="c"># crée Qdrant + collections, Postgres + Timescale, n8n provisionné,</span>
+<span class="c"># classifier, llm-server et news_getter</span></code></pre>
+
+  <h4>2 · Backend</h4>
+  <pre><code><span class="k">cd</span> backend && npm install
+cp .env.exemple .env       <span class="c"># PORT, PG*, N8N_WEBHOOK_URL, QDRANT_*…</span>
+npm run dev                <span class="c"># http://localhost:3001</span></code></pre>
+
+  <h4>3 · Frontend</h4>
+  <pre><code><span class="k">cd</span> frontend && npm install
+npm run dev                <span class="c"># http://localhost:5173</span></code></pre>
+
+  <h4>4 · Indexation de la presse (automatique)</h4>
+  <pre><code><span class="c"># news_getter démarre avec Docker Compose — aucune action manuelle</span>
+<span class="c"># Premier cycle au démarrage, puis toutes les ~150 min (INTERVAL_MINUTES)</span>
+<span class="c"># Pour accélérer la fréquence :</span>
+<span class="k">INTERVAL_MINUTES</span>=<span class="s">30</span>  <span class="c"># dans docker_services/.env</span></code></pre>
+
+  <div class="callout note">
+    <span class="ct">Authentification Bluesky</span>
+    La connexion utilise un <em>App Password</em> (jamais le mot de passe principal), généré depuis les réglages Bluesky. Le backend agit comme proxy AT Protocol pour le compte de l'utilisateur.
+  </div>
+</section>
+
+<!-- ============== 13 LIMITES ============== -->
+<section id="limites">
+  <div class="eyebrow"><span class="num">13</span> Perspectives</div>
+  <h2>Limites connues & pistes d'évolution</h2>
+  <p>Le MVP atteint son objectif, mais plusieurs axes restent ouverts — ils dessinent la feuille de route au-delà du projet.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <span class="pill">DÉPENDANCE AU CORPUS</span>
+      <h4>Couverture des sources</h4>
+      <p>Un verdict ne vaut que ce que vaut le corpus de référence. Les sujets non couverts par la presse indexée restent « non vérifiables ». Étendre et diversifier les sources (notamment francophones) améliorerait directement le rappel.</p>
+    </div>
+    <div class="card">
+      <span class="pill">FENÊTRE TEMPORELLE</span>
+      <h4>Actualité chaude</h4>
+      <p>L'index se rafraîchit périodiquement ; une affirmation plus récente que le dernier cycle peut manquer de sources. Réduire l'intervalle ou prioriser les sujets émergents est une piste.</p>
+    </div>
+    <div class="card">
+      <span class="pill">PASSAGE À L'ÉCHELLE</span>
+      <h4>Volume Bluesky</h4>
+      <p>L'analyse est aujourd'hui à la demande. Industrialiser un traitement continu supposerait une file de messages (Kafka) et un traitement distribué (Spark), déjà envisagés.</p>
+    </div>
+    <div class="card">
+      <span class="pill">EXPLICABILITÉ</span>
+      <h4>Poids des mots</h4>
+      <p>Le système expose déjà la source de preuve et les comptages NLI ; une explicabilité plus fine (contributions par mot) renforcerait la confiance des fact-checkers.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 14 ANNEXES ============== -->
+<section id="annexes">
+  <div class="eyebrow"><span class="num">14</span> Annexes</div>
+  <h2>Référence rapide</h2>
+
+  <h3>Principaux endpoints d'inférence</h3>
+  <table class="tbl">
+    <thead><tr><th>Service</th><th>Endpoint</th><th>Fonction</th></tr></thead>
+    <tbody>
+      <tr><td class="src">classifier</td><td><span class="mono">POST /topic</span></td><td class="src">Porte de routage (checkable)</td></tr>
+      <tr><td class="src">classifier</td><td><span class="mono">POST /sentiment</span></td><td class="src">Tonalité du message</td></tr>
+      <tr><td class="src">classifier</td><td><span class="mono">POST /verify</span></td><td class="src">Verdict NLI vs sources</td></tr>
+      <tr><td class="src">news_getter</td><td><span class="mono">POST /embed</span></td><td class="src">Vecteur 384-d du message</td></tr>
+      <tr><td class="src">llm-server</td><td><span class="mono">POST /v1/chat/completions</span></td><td class="src">Escalade générative (Qwen)</td></tr>
+      <tr><td class="src">backend</td><td><span class="mono">GET /api/dashboard/:did</span></td><td class="src">KPIs par profil</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Glossaire express</h3>
+  <table class="tbl">
+    <tbody>
+      <tr><td><strong>RAG</strong></td><td class="src">Recherche augmentée : retrouver les documents pertinents avant de juger.</td></tr>
+      <tr><td><strong>NLI</strong></td><td class="src">Inférence en langage naturel : un texte en soutient-il, contredit-il ou ignore-t-il un autre&nbsp;?</td></tr>
+      <tr><td><strong>Embedding</strong></td><td class="src">Représentation vectorielle d'un texte permettant la comparaison sémantique.</td></tr>
+      <tr><td><strong>Hypertable</strong></td><td class="src">Table TimescaleDB partitionnée par le temps, optimisée pour les séries.</td></tr>
+      <tr><td><strong>News Getter</strong></td><td class="src">Service Python qui collecte les articles de presse (BBC, RSS, NewsAPI), les vectorise et les indexe dans Qdrant toutes les ~150 minutes.</td></tr>
+      <tr><td><strong>Trust score</strong></td><td class="src">Indicateur de fiabilité d'un profil dérivé de ses verdicts.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+
+<footer class="docfoot">
+  <div class="doc">
+    <div><strong>Thumalien</strong> — Documentation technique · Détection de fake news sur Bluesky</div>
+    <div>Sup de Vinci · Mastère 1 Big Data & IA · 2025–2026</div>
+  </div>
+</footer>
+
+</body>
+</html>
