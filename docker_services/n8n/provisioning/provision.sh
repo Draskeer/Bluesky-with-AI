@@ -24,4 +24,7 @@ echo "--- Creation des data tables de logs ---"
 node /home/node/provisioning/seed-datatables.js || echo "seed data tables: echec"
 
 echo "=== provisioning termine ==="
-echo "NOTE: active le workflow via le toggle de l'UI (http://localhost:5678)."
+
+# 4. Activation automatique des workflows via l'API REST
+echo "--- Activation des workflows ---"
+node /home/node/provisioning/activate-workflows.js || echo "activation: echec (a faire manuellement dans l'UI)"

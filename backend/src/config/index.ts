@@ -18,8 +18,10 @@ const configSchema = z.object({
   // Bluesky
   BLUESKY_SERVICE_URL: z.string().default('https://bsky.social'),
   
-  // N8N Webhook (path correspond au nœud Webhook du workflow "Bluesky with AI")
+  // N8N Webhooks
   N8N_WEBHOOK_URL: z.string().default('http://localhost:5678/webhook/0dde0006-a389-47f5-ae16-caeae58037bc'),
+  // Webhook n8n dédié à l'indexation des fake reports dans Qdrant (1536-dim, compatible workflow d'analyse)
+  N8N_REPORT_WEBHOOK_URL: z.string().default(''),
 
   // Base de données PostgreSQL (db bluesky_ai — table "messages")
   PGHOST: z.string().default('localhost'),
@@ -33,6 +35,13 @@ const configSchema = z.object({
   ANALYSIS_MAX_CONCURRENT: z.coerce.number().default(10),
   ANALYSIS_TIMEOUT_MS: z.coerce.number().default(30000),
   
+  // Qdrant (fake reports collection)
+  QDRANT_URL: z.string().default('http://localhost:6333'),
+  QDRANT_API_KEY: z.string().default(''),
+
+  // Embedding API (news_getter — paraphrase-multilingual-MiniLM-L12-v2, 384 dims)
+  EMBED_API_URL: z.string().default('http://localhost:8001'),
+
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info')
 });

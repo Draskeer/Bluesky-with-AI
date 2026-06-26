@@ -4,9 +4,10 @@
 
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { config } from '../config/index.js';
 import { getAnalysisManager } from '../services/analysis-manager.js';
 import { getBlueskyService } from '../services/bluesky.service.js';
-import { getMessageAnalysis } from '../services/db.js';
+import { getMessageAnalysis, upsertPostReport, getPostReportCounts, getCommunityVerdicts } from '../services/db.js';
 import { sendPostToN8n } from '../utils/n8n-webhook.js';
 import { logger } from '../utils/logger.js';
 import type { AnalyzableContent } from '../types/analyzer.js';
@@ -26,6 +27,13 @@ const configureAnalyzerSchema = z.object({
   enabled: z.boolean().optional(),
   priority: z.number().optional(),
   options: z.record(z.unknown()).optional()
+});
+
+// Schéma du signalement d'un post comme fake
+const reportPostSchema = z.object({
+  uri:    z.string().min(1),
+  text:   z.string().default(''),
+  author: z.string().default(''),
 });
 
 // Schéma d'une demande d'analyse IA (déclenchement n8n)
@@ -56,7 +64,7 @@ function pruneStaleInFlight(): void {
 type AiResult =
   | { status: 'pending' }
   | { status: 'failed' }
-  | { status: 'done'; is_fake: boolean; confidence: number; mood: string | null };
+  | { status: 'done'; is_fake: boolean; confidence: number; mood: string | null; report_count: number };
 
 /**
  * Construit la map de résultats pour une liste d'IDs à partir de la base.
@@ -64,18 +72,79 @@ type AiResult =
  */
 async function buildResults(ids: string[]): Promise<Record<string, AiResult>> {
   pruneStaleInFlight();
-  const known = await getMessageAnalysis(ids);
+  const [known, reportCounts, communityVerdicts] = await Promise.all([
+    getMessageAnalysis(ids),
+    getPostReportCounts(ids),
+    getCommunityVerdicts(ids),
+  ]);
   const results: Record<string, AiResult> = {};
 
   for (const id of ids) {
-    const row = known.get(id);
+    // Un verdict communautaire (similarité Qdrant) prend le dessus sur le résultat n8n
+    const cv = communityVerdicts.get(id);
+    const row = cv
+      ? { message_id: id, is_fake: cv.is_fake, confidence: cv.confidence, mood: null as any }
+      : known.get(id);
+    const reportCount = reportCounts.get(id) ?? cv?.report_count ?? 0;
+
     if (row) {
       inFlight.delete(id); // résultat disponible : plus en attente
+
+      // Ajustement du verdict en fonction des signalements communautaires.
+      //
+      // Protection GRADUÉE (pas absolue) pour permettre la correction des erreurs IA :
+      //
+      //   conf < 0.60  (Non vérifié)  → flip dès 3 reports
+      //   conf 0.60-0.79 (Vérifié ~)  → flip dès 5 reports
+      //   conf >= 0.80 (Vérifié fort) → flip dès 10 reports
+      //
+      // Confiance après flip plafonnée selon la certitude du verdict IA originel :
+      //   override d'un verdict fort (>= 0.80) → plafonné à 65 % (signal communautaire)
+      //   override d'un verdict modéré          → plafonné à 75 %
+      //   override d'un non-vérifié             → plafonné à 75 %
+      //
+      // Boost : posts déjà détectés fake par l'IA → +5% par report (max +30%).
+      let flipThreshold = 3; // 3 reports suffisent pour tout niveau de confiance IA
+      let maxFlipConf: number;
+      if (row.confidence >= 0.80) {
+        maxFlipConf = 0.65; // override d'un verdict IA fort → résultat plafonné à 65%
+      } else {
+        maxFlipConf = 0.75;
+      }
+
+      const communityFlip = !row.is_fake && reportCount >= flipThreshold;
+      const isFake = row.is_fake || communityFlip;
+
+      let confidence: number;
+      if (communityFlip) {
+        // 7% par report, plafonné selon la confiance du verdict IA original
+        // Ex. 13 reports sur un "Vérifié 95%" → min(0.91, 0.65) = "Fake 65%"
+        confidence = Math.min(reportCount * 0.07, maxFlipConf);
+      } else if (row.is_fake) {
+        // L'IA a déjà détecté fake → chaque report renforce la confiance
+        confidence = Math.min(row.confidence + Math.min(reportCount * 0.05, 0.30), 0.95);
+      } else {
+        // Pas assez de reports pour flipper → verdict IA inchangé
+        confidence = row.confidence;
+      }
+
       results[id] = {
         status: 'done',
-        is_fake: row.is_fake,
-        confidence: row.confidence,
-        mood: row.mood
+        is_fake: isFake,
+        confidence,
+        mood: row.mood,
+        report_count: reportCount,
+      };
+    } else if (reportCount >= 3) {
+      // Pas d'analyse IA, mais assez de signalements communautaires pour conclure fake.
+      // Seuil identique au flip "conf < 0.60" : 3 reports suffisent.
+      inFlight.delete(id);
+      results[id] = {
+        status: 'done',
+        is_fake: true,
+        confidence: Math.min(reportCount * 0.07, 0.75),
+        mood: null,
+        report_count: reportCount,
       };
     } else if (inFlight.has(id)) {
       results[id] = { status: 'pending' }; // déclenché, résultat pas encore en base
@@ -442,16 +511,16 @@ router.post('/request', async (req: Request, res: Response) => {
 
     const results = await buildResults(ids);
 
-    // Déclencher n8n pour les posts pas encore en base et pas déjà en cours.
-    // 'failed' = jamais déclenché OU tentative précédente expirée -> (re)lancer.
+    // Déclencher n8n pour les posts sans verdict.
+    // n8n gère la recherche sémantique (news_articles + fake_reports) et l'appel Qwen.
     // On exclut les messages vides (image seule, repost) : le nœud "Data Verification"
-    // de n8n lève une erreur sur un champ vide -> exécution morte sans INSERT. Inutile
-    // de déclencher : ils restent 'failed'.
+    // de n8n lève une erreur sur un champ vide -> exécution morte sans INSERT.
     const toTrigger = posts.filter(
       p => results[p.msg_id].status === 'failed' &&
            !inFlight.has(p.msg_id) &&
            p.message.trim().length > 0
     );
+
 
     await Promise.all(toTrigger.map(async (p) => {
       inFlight.set(p.msg_id, Date.now());
@@ -474,6 +543,41 @@ router.post('/request', async (req: Request, res: Response) => {
     }
     logger.error('AI analysis request error:', error);
     res.status(500).json({ success: false, error: 'Failed to request analysis' });
+  }
+});
+
+/**
+ * POST /api/analysis/report
+ * Signale un post comme fake news.
+ * - Incrémente le compteur dans PostgreSQL (table post_reports).
+ * - Upserte le vecteur dans Qdrant (collection fake_reports) pour référence future.
+ * - Le compteur influence le verdict final dans buildResults().
+ */
+router.post('/report', async (req: Request, res: Response) => {
+  try {
+    const { uri, text, author } = reportPostSchema.parse(req.body);
+
+    const reportCount = await upsertPostReport(uri, text, author);
+
+    // Déclenche n8n pour indexer le fake report dans Qdrant (1536-dim, même modèle que le workflow d'analyse).
+    // Non-bloquant : on ne attend pas la réponse n8n.
+    const reportWebhook = config.N8N_REPORT_WEBHOOK_URL;
+    if (reportWebhook) {
+      fetch(reportWebhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uri, text, author, report_count: reportCount }),
+      }).catch(err => logger.warn(`n8n report webhook failed: ${err?.message}`));
+    }
+
+    res.json({ success: true, data: { report_count: reportCount } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ success: false, error: 'Invalid request', details: error.errors });
+      return;
+    }
+    logger.error('Report post error:', error);
+    res.status(500).json({ success: false, error: 'Failed to report post' });
   }
 });
 

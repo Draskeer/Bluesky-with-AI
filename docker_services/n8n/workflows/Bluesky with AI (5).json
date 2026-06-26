@@ -369,7 +369,34 @@
     },
     {
       "parameters": {
-        "jsCode": "const msg = $('Data Verification').item.json.message;\nconst hits = $input.first().json.result || [];\nconst articles = hits.map(h => ({\n  title: (h.payload && h.payload.title) || '',\n  summary: (h.payload && h.payload.summary) || '',\n  score: typeof h.score === 'number' ? h.score : 0\n}));\nreturn [{ json: { message: msg, articles } }];"
+        "method": "POST",
+        "url": "http://qdrant:6333/collections/fake_reports/points/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ vector: $('Embed Message').item.json.vector, limit: 3, with_payload: true, score_threshold: 0.65 }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "JMEmm98ahxB3zJ71",
+          "name": "Qdrant account"
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1060,
+        -500
+      ],
+      "id": "b1000011-0000-0000-0000-000000000011",
+      "name": "Qdrant Search Fakes",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $('Data Verification').item.json.message;\nconst newsHits = $('Qdrant Search').item.json.result || [];\nconst fakeHits = $input.first().json.result || [];\n\nconst articles = newsHits.map(h => ({\n  title: (h.payload && h.payload.title) || '',\n  summary: (h.payload && h.payload.summary) || '',\n  score: typeof h.score === 'number' ? h.score : 0\n}));\n\nconst fakeReports = fakeHits.map(h => ({\n  text: (h.payload && h.payload.text) || '',\n  report_count: (h.payload && h.payload.report_count) || 1,\n  score: typeof h.score === 'number' ? h.score : 0\n}));\n\nreturn [{ json: { message: msg, articles, fakeReports } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -401,6 +428,17 @@
     },
     {
       "parameters": {
+        "jsCode": "const v = $input.first().json;\nconst fakeScore = typeof v.fake_score === 'number' ? v.fake_score : 0;\nconst realScore = typeof v.real_score === 'number' ? v.real_score : 0;\nconst needsLlm = v.needs_llm === true;\nconst gap = Math.abs(fakeScore - realScore);\n\n// Poids communautaire : similarite Qdrant x report_count de chaque fake similaire\nconst fakeReports = $('Build Articles').item.json.fakeReports || [];\nconst totalWeight = fakeReports.reduce((s, r) => s + (r.score * Math.min(r.report_count, 20)), 0);\nconst communityIsFake = totalWeight >= 3;\nconst communityConfidence = Math.min(totalWeight * 0.07, 0.85);\n\nlet useLlm;\nif (communityIsFake) {\n  useLlm = false;\n} else if (v.reason === 'no_related_news') {\n  useLlm = false;\n} else if (gap > 0.3 && !needsLlm) {\n  useLlm = false;\n} else {\n  useLlm = (realScore - fakeScore) < 0.4;\n}\nreturn [{ json: { ...v, use_llm: useLlm, community_is_fake: communityIsFake, community_confidence: communityConfidence } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1460, -352],
+      "id": "ldec0001-0000-0000-0000-000000000001",
+      "name": "LLM Decision",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -410,7 +448,7 @@
           "conditions": [
             {
               "id": "needs-llm",
-              "leftValue": "={{ $json.needs_llm }}",
+              "leftValue": "={{ $json.use_llm }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -426,7 +464,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1460,
+        1660,
         -352
       ],
       "id": "b1000007-0000-0000-0000-000000000007",
@@ -434,7 +472,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const msg = $('Data Verification').item.json.message;\nconst articles = $('Build Articles').item.json.articles || [];\nconst context = articles.map((a, i) => {\n  const score = (typeof a.score === 'number') ? a.score.toFixed(3) : '?';\n  return `${i + 1}. [similarite ${score}] ${a.title || ''} - ${a.summary || ''}`;\n}).join('\\n');\nconst prompt_input = `Voici des articles de vraies actualites similaires (base de reference) :\\n${context || '(aucun article similaire trouve)'}\\n\\nMessage a analyser : \"${msg}\"`;\nreturn [{ json: { prompt_input } }];"
+        "jsCode": "const msg = $('Data Verification').item.json.message;\nconst articles = $('Build Articles').item.json.articles || [];\nconst fakeReports = $('Build Articles').item.json.fakeReports || [];\n\nconst newsContext = articles.map((a, i) => {\n  const score = (typeof a.score === 'number') ? a.score.toFixed(3) : '?';\n  return `${i + 1}. [similarite ${score}] ${a.title || ''} - ${a.summary || ''}`;\n}).join('\\n');\n\nlet fakeContext = '';\nif (fakeReports.length > 0) {\n  const fakeLines = fakeReports.map((f, i) => {\n    const score = (typeof f.score === 'number') ? f.score.toFixed(3) : '?';\n    return `${i + 1}. [similarite ${score}, signale ${f.report_count} fois] ${f.text || ''}`;\n  }).join('\\n');\n  fakeContext = '\\n\\nFake news similaires signalees par la communaute :\\n' + fakeLines;\n}\n\nconst prompt_input = `Voici des articles de vraies actualites similaires (base de reference) :\\n${newsContext || '(aucun article similaire trouve)'}${fakeContext}\\n\\nMessage a analyser : \"${msg}\"`;\nreturn [{ json: { prompt_input } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -494,7 +532,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const v = $input.first().json;\nconst mood = $('Sentiment (BERT)').item.json.mood || 'neutral';\nconst is_fake = v.is_fake === true || v.is_fake === 'true';\nlet conf = v.confidence;\nconf = typeof conf === 'number' ? conf : (parseFloat(conf) || 0);\nconst verdict = v.verdict || (is_fake ? 'fake' : 'real');\nreturn [{ json: { is_fake, confidence: conf, verdict, mood } }];"
+        "jsCode": "const v = $input.first().json;\nconst mood = $('Sentiment (BERT)').item.json.mood || 'neutral';\n\nif (v.community_is_fake) {\n  return [{ json: { is_fake: true, confidence: v.community_confidence || 0.5, verdict: 'fake', mood } }];\n}\n\nconst is_fake = v.is_fake === true || v.is_fake === 'true';\nlet conf = v.confidence;\nconf = typeof conf === 'number' ? conf : (parseFloat(conf) || 0);\nconst verdict = v.verdict || (is_fake ? 'fake' : 'real');\nreturn [{ json: { is_fake, confidence: conf, verdict, mood } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -656,6 +694,17 @@
       "main": [
         [
           {
+            "node": "Qdrant Search Fakes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Search Fakes": {
+      "main": [
+        [
+          {
             "node": "Build Articles",
             "type": "main",
             "index": 0
@@ -682,6 +731,17 @@
       ]
     },
     "Verify (NLI)": {
+      "main": [
+        [
+          {
+            "node": "LLM Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Decision": {
       "main": [
         [
           {

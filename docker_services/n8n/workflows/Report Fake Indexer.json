@@ -1,0 +1,117 @@
+{
+  "name": "Report Fake Indexer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "report-fake",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-400, 0],
+      "id": "rfi00001-0000-0000-0000-000000000001",
+      "name": "Webhook Report Fake",
+      "webhookId": "a2bcd3ef-4567-4890-abcd-ef0123456789"
+    },
+    {
+      "parameters": {
+        "jsCode": "var data = $input.first().json.body || $input.first().json;\nvar uri = String(data.uri || '');\nvar text = String(data.text || '');\nvar author = String(data.author || '');\nvar report_count = Number(data.report_count || 1);\n\nif (!uri) throw new Error('uri manquant');\n\nvar h = 5381;\nfor (var i = 0; i < uri.length; i++) {\n  h = (((h << 5) + h) ^ uri.charCodeAt(i)) >>> 0;\n}\n\nreturn [{ json: { uri: uri, text: text, author: author, report_count: report_count, point_id: h } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-200, 0],
+      "id": "rfi00002-0000-0000-0000-000000000002",
+      "name": "Prepare"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://news_getter:8001/embed",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [0, 0],
+      "id": "rfi00003-0000-0000-0000-000000000003",
+      "name": "Embed Report"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "http://qdrant:6333/collections/fake_reports/points",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ points: [{ id: $('Prepare').item.json.point_id, vector: $json.vector, payload: { post_uri: $('Prepare').item.json.uri, text: $('Prepare').item.json.text.slice(0, 500), author: $('Prepare').item.json.author, report_count: $('Prepare').item.json.report_count, reported_at: new Date().toISOString() } }] }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "JMEmm98ahxB3zJ71",
+          "name": "Qdrant account"
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [200, 0],
+      "id": "rfi00004-0000-0000-0000-000000000004",
+      "name": "Qdrant Upsert Fake"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Report Fake": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare": {
+      "main": [
+        [
+          {
+            "node": "Embed Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Report": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Upsert Fake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "718b59af9bccfcbbc7faadae36b03f3caad98b4e7f805a18fb39e37b467d7324"
+  },
+  "id": "ReportFakeIndexer1",
+  "tags": []
+}

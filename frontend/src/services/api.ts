@@ -27,7 +27,7 @@ export type Mood = 'positive' | 'neutral' | 'negative';
 export type AiAnalysis =
   | { status: 'pending' }
   | { status: 'failed' }
-  | { status: 'done'; is_fake: boolean; confidence: number; mood: Mood | null };
+  | { status: 'done'; is_fake: boolean; confidence: number; mood: Mood | null; report_count?: number };
 
 export interface AiPostInput {
   msg_id: string;
@@ -153,6 +153,18 @@ export const api = {
     ): Promise<ApiResponse<{ results: Record<string, AiAnalysis> }>> => {
       const query = encodeURIComponent(ids.join(','));
       return request<{ results: Record<string, AiAnalysis> }>(`/analysis/results?ids=${query}`);
+    },
+
+    // Signale un post comme fake news — incrémente le compteur communautaire.
+    report: async (
+      uri: string,
+      text: string,
+      author: string
+    ): Promise<ApiResponse<{ report_count: number }>> => {
+      return request<{ report_count: number }>('/analysis/report', {
+        method: 'POST',
+        body: JSON.stringify({ uri, text, author }),
+      });
     },
   },
 

@@ -275,6 +275,7 @@ def verify(req: VerifyRequest):
         return {
             "verdict": "unverified", "is_fake": False, "confidence": 0.0,
             "needs_llm": False, "evidence_title": None, "reason": "no_related_news",
+            "fake_score": 0.0, "real_score": 0.0,
         }
 
     best_contra = {"p": 0.0, "title": None}
@@ -303,15 +304,19 @@ def verify(req: VerifyRequest):
         "sources_checked": total,
     }
 
+    fake_s = round(best_contra["p"], 4)
+    real_s = round(best_entail["p"], 4)
+
     # FAKE : contradiction domine clairement
     if (n_refute > n_support
             and best_contra["p"] >= nli_hi
             and best_contra["p"] >= best_entail["p"] + FAKE_MARGIN):
         return {
             "verdict": "fake", "is_fake": True,
-            "confidence": round(best_contra["p"], 4),
+            "confidence": fake_s,
             "needs_llm": False, "evidence_title": best_contra["title"],
-            "reason": "nli_contradiction", **extra,
+            "reason": "nli_contradiction",
+            "fake_score": fake_s, "real_score": real_s, **extra,
         }
 
     # REAL : entailment fort ou corroboration multi-sources
@@ -321,11 +326,10 @@ def verify(req: VerifyRequest):
             "confidence": round(max(best_entail["p"], corroboration), 4),
             "needs_llm": False, "evidence_title": best_entail["title"],
             "reason": "corroborated" if n_support >= CORRO_MIN else "nli_entailment",
-            **extra,
+            "fake_score": fake_s, "real_score": real_s, **extra,
         }
 
     # COUVERTURE : beaucoup de sources sur le même sujet + au moins 1 soutien NLI
-    # (n_support >= 1 obligatoire : évite de valider juste parce que le sujet est très couvert)
     if total >= COVERAGE_MIN and n_refute == 0 and n_support >= 1:
         cov_conf = round(min(0.60 + 0.02 * total, 0.85), 4)
         return {
@@ -333,7 +337,8 @@ def verify(req: VerifyRequest):
             "confidence": cov_conf,
             "needs_llm": False,
             "evidence_title": best_entail["title"] or (relevant[0].title if relevant else None),
-            "reason": "topic_corroborated", **extra,
+            "reason": "topic_corroborated",
+            "fake_score": fake_s, "real_score": real_s, **extra,
         }
 
     # UNVERIFIED : sujet couvert mais pas de signal net
@@ -342,7 +347,8 @@ def verify(req: VerifyRequest):
         "confidence": round(max(best_contra["p"], best_entail["p"]), 4),
         "needs_llm": ENABLE_LLM_ESCALATION,
         "evidence_title": best_entail["title"] or best_contra["title"],
-        "reason": "nli_ambiguous", **extra,
+        "reason": "nli_ambiguous",
+        "fake_score": fake_s, "real_score": real_s, **extra,
     }
 
 

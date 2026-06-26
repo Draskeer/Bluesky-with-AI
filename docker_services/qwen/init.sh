@@ -50,6 +50,23 @@ curl -X PUT "$QDRANT_URL/collections/$COLLECTION_NAME/index" \
 
 echo ""
 echo "✅ Collection '$COLLECTION_NAME' prête !"
+
+# ── fake_reports : signalements communautaires (384-dim, cosine) ──────────────
+FAKE_COLLECTION="fake_reports"
+echo ""
+echo "🚀 Création de la collection '$FAKE_COLLECTION'..."
+curl -s -X GET "$QDRANT_URL/collections/$FAKE_COLLECTION" \
+  -H "api-key: $QDRANT_API_KEY" | grep -q '"status"' \
+  && echo "  (déjà existante — skip)" \
+  || curl -X PUT "$QDRANT_URL/collections/$FAKE_COLLECTION" \
+       -H "Content-Type: application/json" \
+       -H "api-key: $QDRANT_API_KEY" \
+       -d '{
+         "vectors": { "size": 384, "distance": "Cosine" },
+         "optimizers_config": { "default_segment_number": 2 },
+         "replication_factor": 1
+       }' && echo "" && echo "✅ Collection '$FAKE_COLLECTION' prête !"
+
 echo ""
 echo "Variables d'environnement à configurer dans n8n :"
 echo "  QDRANT_URL=$QDRANT_URL"

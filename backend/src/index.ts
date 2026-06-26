@@ -10,6 +10,7 @@ import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { getAnalysisManager } from './services/analysis-manager.js';
 import { registerDefaultAnalyzers } from './analyzers/index.js';
+import { initializeDatabase } from './services/db.js';
 import apiRoutes from './api/index.js';
 
 async function bootstrap() {
@@ -47,6 +48,14 @@ async function bootstrap() {
       error: config.NODE_ENV === 'development' ? err.message : 'Internal server error'
     });
   });
+
+  // Initialiser la base de données (crée post_reports si absent)
+  try {
+    await initializeDatabase();
+    logger.info('Database initialized');
+  } catch (err) {
+    logger.warn('Database initialization failed (will retry on next request):', err);
+  }
 
   // Initialiser le gestionnaire d'analyse
   const analysisManager = getAnalysisManager({

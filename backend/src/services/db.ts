@@ -18,6 +18,20 @@ export interface MessageAnalysis {
   mood: Mood | null;
 }
 
+export interface PostReport {
+  post_uri: string;
+  report_count: number;
+}
+
+export interface CommunityVerdict {
+  message_id:   string;
+  is_fake:      boolean;
+  confidence:   number;
+  matched_uri:  string | null;
+  similarity:   number | null;
+  report_count: number | null;
+}
+
 // Instance singleton du pool de connexions
 let pool: pg.Pool | null = null;
 
@@ -36,6 +50,146 @@ export function getPool(): pg.Pool {
     });
   }
   return pool;
+}
+
+/**
+ * Crée la table post_reports si elle n'existe pas encore.
+ * Appelé au démarrage du backend — idempotent.
+ */
+export async function initializeDatabase(): Promise<void> {
+  const db = getPool();
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS post_reports (
+      post_uri         VARCHAR(512) PRIMARY KEY,
+      report_count     INT          NOT NULL DEFAULT 1,
+      text             TEXT,
+      author           VARCHAR(255),
+      created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      last_reported_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  // Verdicts communautaires : résultats issus de la similarité Qdrant (court-circuit n8n)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS community_verdicts (
+      message_id   VARCHAR(512) PRIMARY KEY,
+      is_fake      BOOLEAN      NOT NULL DEFAULT true,
+      confidence   FLOAT        NOT NULL,
+      matched_uri  VARCHAR(512),
+      similarity   FLOAT,
+      report_count INT,
+      created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+/**
+ * Sauvegarde un verdict communautaire (similarité Qdrant) pour un post.
+ * Crée la table si elle n'existe pas encore.
+ */
+export async function saveCommunityVerdict(
+  messageId:   string,
+  confidence:  number,
+  matchedUri:  string,
+  similarity:  number,
+  reportCount: number
+): Promise<void> {
+  try {
+    await getPool().query(
+      `INSERT INTO community_verdicts (message_id, is_fake, confidence, matched_uri, similarity, report_count)
+       VALUES ($1, true, $2, $3, $4, $5)
+       ON CONFLICT (message_id) DO UPDATE
+         SET confidence   = EXCLUDED.confidence,
+             matched_uri  = EXCLUDED.matched_uri,
+             similarity   = EXCLUDED.similarity,
+             report_count = EXCLUDED.report_count,
+             created_at   = NOW()`,
+      [messageId, confidence, matchedUri, similarity, reportCount]
+    );
+  } catch (err: any) {
+    if (err?.code !== '42P01') throw err;
+    await initializeDatabase();
+    await getPool().query(
+      `INSERT INTO community_verdicts (message_id, is_fake, confidence, matched_uri, similarity, report_count)
+       VALUES ($1, true, $2, $3, $4, $5)
+       ON CONFLICT (message_id) DO UPDATE
+         SET confidence   = EXCLUDED.confidence,
+             matched_uri  = EXCLUDED.matched_uri,
+             similarity   = EXCLUDED.similarity,
+             report_count = EXCLUDED.report_count,
+             created_at   = NOW()`,
+      [messageId, confidence, matchedUri, similarity, reportCount]
+    );
+  }
+}
+
+/**
+ * Récupère les verdicts communautaires existants pour une liste de message_ids.
+ */
+export async function getCommunityVerdicts(ids: string[]): Promise<Map<string, CommunityVerdict>> {
+  const result = new Map<string, CommunityVerdict>();
+  if (ids.length === 0) return result;
+  try {
+    const { rows } = await getPool().query<CommunityVerdict>(
+      `SELECT message_id, is_fake, confidence, matched_uri, similarity, report_count
+       FROM community_verdicts WHERE message_id = ANY($1)`,
+      [ids]
+    );
+    for (const row of rows) result.set(row.message_id, row);
+  } catch (err: any) {
+    if (err?.code === '42P01') return result;
+    throw err;
+  }
+  return result;
+}
+
+const INSERT_REPORT_SQL = `
+  INSERT INTO post_reports (post_uri, report_count, text, author)
+  VALUES ($1, 1, $2, $3)
+  ON CONFLICT (post_uri) DO UPDATE
+    SET report_count     = post_reports.report_count + 1,
+        last_reported_at = NOW()
+  RETURNING report_count
+`;
+
+/**
+ * Insère ou incrémente le compteur de signalement pour un post.
+ * Crée la table automatiquement si elle n'existe pas encore (code 42P01).
+ * Renvoie le nouveau total de signalements.
+ */
+export async function upsertPostReport(uri: string, text: string, author: string): Promise<number> {
+  try {
+    const { rows } = await getPool().query<PostReport>(INSERT_REPORT_SQL, [uri, text, author]);
+    return rows[0]?.report_count ?? 1;
+  } catch (err: any) {
+    if (err?.code !== '42P01') throw err; // erreur inattendue → propager
+    // Table absente (premier démarrage ou init ratée) → créer et réessayer
+    await initializeDatabase();
+    const { rows } = await getPool().query<PostReport>(INSERT_REPORT_SQL, [uri, text, author]);
+    return rows[0]?.report_count ?? 1;
+  }
+}
+
+/**
+ * Récupère les compteurs de signalement pour plusieurs posts.
+ * Retourne une Map vide si la table n'existe pas encore (silencieux).
+ */
+export async function getPostReportCounts(uris: string[]): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (uris.length === 0) return result;
+  let rows: PostReport[];
+  try {
+    ({ rows } = await getPool().query<PostReport>(
+      `SELECT post_uri, report_count FROM post_reports WHERE post_uri = ANY($1)`,
+      [uris]
+    ));
+  } catch (err: any) {
+    if (err?.code === '42P01') return result; // table pas encore créée — on ignore
+    throw err;
+  }
+  for (const row of rows) {
+    result.set(row.post_uri, row.report_count);
+  }
+  return result;
 }
 
 /**

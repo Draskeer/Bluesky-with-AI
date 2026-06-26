@@ -202,8 +202,13 @@ function AiBadge({
       title: `Aucune preuve trouvée dans la base d'actualités (ni confirmé, ni contredit)` },
   }[state];
 
+  const reportCount = analysis.report_count ?? 0;
+  const reportTitle = reportCount > 0
+    ? ` · Signalé ${reportCount} fois par la communauté`
+    : "";
+
   return (
-    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${STYLE.bg} cursor-help`} title={STYLE.title + moodSuffix}>
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${STYLE.bg} cursor-help`} title={STYLE.title + moodSuffix + reportTitle}>
       {state === "fake" ? (
         <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
@@ -219,6 +224,14 @@ function AiBadge({
       )}
       <span className={`text-xs font-semibold ${STYLE.text}`}>{STYLE.label}</span>
       {mood && <span className="text-xs" title={`Humeur : ${mood.label}`}>{mood.emoji}</span>}
+      {reportCount > 0 && (
+        <span
+          className="text-xs font-semibold text-orange-400 border border-orange-400/30 rounded px-1"
+          title={`Signalé ${reportCount} fois comme fake par la communauté`}
+        >
+          ⚑ {reportCount}
+        </span>
+      )}
     </div>
   );
 }
@@ -255,6 +268,7 @@ export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPo
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [reported, setReported] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
@@ -426,6 +440,27 @@ export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPo
       setShowMoreMenu(false);
     } catch (err) {
       console.error("Copy text error:", err);
+    }
+  };
+
+  const handleReport = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMoreMenu(false);
+    try {
+      const response = await api.analysis.report(
+        post.uri,
+        post.record.text || "",
+        post.author.handle
+      );
+      if (response.success && response.data) {
+        setReported(true);
+        const count = response.data.report_count;
+        showNotification(`Signalé (${count} signalement${count > 1 ? "s" : ""})`);
+      } else {
+        showNotification("Erreur lors du signalement");
+      }
+    } catch {
+      showNotification("Erreur lors du signalement");
     }
   };
 
@@ -729,14 +764,15 @@ export default function PostCard({ post, reason, isReply, showReplyTo, onReplyPo
       <div className="border-t border-[#2f3e4e]" />
       
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          showNotification("Fonctionnalité à venir");
-          setShowMoreMenu(false);
-        }}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#1c2938] transition text-left"
+        onClick={handleReport}
+        disabled={reported}
+        className={`w-full px-4 py-3 flex items-center justify-between transition text-left ${
+          reported ? "opacity-50 cursor-default" : "hover:bg-[#1c2938]"
+        }`}
       >
-        <span className="text-red-400 text-[15px]">Signaler le post</span>
+        <span className="text-red-400 text-[15px]">
+          {reported ? "Signalé comme fake" : "Signaler comme fake"}
+        </span>
         <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
