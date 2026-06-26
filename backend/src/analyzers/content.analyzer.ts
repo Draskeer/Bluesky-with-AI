@@ -243,7 +243,7 @@ export class ContentAnalyzer extends BaseAnalyzer<ContentAnalysisResult> {
     if (mediaInfo.hasImages || mediaInfo.hasVideo) return 'media-post';
     if (mediaInfo.hasExternalLink) return 'link-share';
     if (QUESTION_PATTERNS.some(p => p.test(text))) return 'question';
-    if (ANNOUNCEMENT_PATTERNS.test(text)) return 'announcement';
+    if (ANNOUNCEMENT_PATTERNS.some(p => p.test(text))) return 'announcement';
     return 'text-only';
   }
 

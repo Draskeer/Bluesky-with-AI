@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import PostCard from "../components/PostCard";
+import ProfileDashboard from "../components/ProfileDashboard";
 import { api } from "../services/api";
 import { useAuthStore } from "../store/auth.store";
 import type { BlueskyProfile, FeedViewPost } from "../types";
@@ -212,6 +213,11 @@ export default function Profile() {
             J'aime
           </button>
         </div>
+      </div>
+
+      {/* Dashboard IA — masqué sur xl (géré par la sidebar) */}
+      <div className="xl:hidden p-4 border-b border-[#2f3e4e]">
+        <ProfileDashboard key={profile.did} did={profile.did} handle={profile.handle} />
       </div>
 
       {/* Posts */}

@@ -64,6 +64,8 @@ async function main() {
 
   if (res.status === 200 || res.status === 201) {
     console.log('[owner] Compte owner créé : ' + email);
+  } else if (res.status === 400 && res.body.includes('already setup')) {
+    console.log('[owner] Compte owner déjà existant, rien à faire.');
   } else {
     console.error('[owner] Erreur setup owner HTTP ' + res.status + ' : ' + res.body.slice(0, 300));
     process.exit(1);
